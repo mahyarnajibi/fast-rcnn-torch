@@ -183,3 +183,38 @@ function FRCNN:__tostring()
   str = str .. '\n  Input area: ' .. self.inputArea
   return str
 end
+
+
+function FRCNN:bbox_decode(boxes,box_deltas)
+  -- Function to decode the output of the network
+  local eps = 1e-14
+  local pred_boxes = torch.Tensor(box_deltas:size())
+  local widths = boxes[{{},{3}}] - boxes[{{},{1}}] + eps
+  local heights = boxes[{{},{4}}] - boxes[{{},{2}}] + eps
+  local centers_x = boxes[{{},{1}] + 0.5 * widths
+  local centers_y = boxes[{{},{3}}] + 0.5 * heights
+
+  local x_inds = torch.range(1,box_deltas:size()[2],4):long()
+  local y_inds = torch.range(2,box_deltas:size()[2],4):long()
+  local w_inds = torch.range(3,box_deltas:size()[2],4):long()
+  local h_inds = torch.range(4,box_deltas:size()[2],4):long()
+
+  local dx = box_deltas:index(2,x_inds)
+  local dy = box_deltas:index(2,y_inds)
+  local dw = box_deltas:index(2,w_inds)
+  local dh = box_deltas:index(2,h_inds)
+
+
+  local predicted_center_x = dx * widths:expand(dx:size()) + centers_x:expand(dx:size())
+  local predicted_center_y = dy * heights:expand(dy:size()) + centers_y:expand(dy:size())
+  local predicted_w = torch.exp(dw) * widths:expand(dw:size())
+  local predicted_h = torch.exp(dh) * heights:expand(dh:size())
+
+  local predicted_boxes = torch.Tensor(box_deltas:size())
+  predicted_boxes:indexCopy(2,x_inds,predicted_center_x)
+  predicted_boxes:indexCopy(2,y_inds,predicted_center_y)
+  predicted_boxes:indexCopy(2,w_inds,predicted_w)
+  predicted_boxes:indexCopy(2,h_inds,predicted_h)
+
+  return predicted_boxes
+end
