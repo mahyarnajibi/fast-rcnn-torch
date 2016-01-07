@@ -1,64 +1,87 @@
-local function loadModel(params,backend)
+local function loadModel()
 
   backend = backend or cudnn
 
-  local features   = nn.Sequential()
+  
+  -- CLASSIFIRE
   local classifier = nn.Sequential()
+  -- REGRESSOR
+  local regressor = nn.Sequential()
   
-  features:add(backend.SpatialConvolution(3,96,11,11,4,4,5,5,1))
-  features:add(backend.ReLU(true))
-  features:add(backend.SpatialMaxPooling(3,3,2,2,1,1))
-  --features:add(backend.SpatialCrossMapLRN(5,0.0001,0.75,1))
-  features:add(inn.SpatialCrossResponseNormalization(5,0.0001,0.75,1))
-  
-  features:add(backend.SpatialConvolution(96,256,5,5,1,1,1,1,2))
-  features:add(backend.ReLU(true))
-  features:add(backend.SpatialMaxPooling(3,3,2,2,1,1))
-  --features:add(backend.SpatialCrossMapLRN(5,0.0001,0.75,1))
-  features:add(inn.SpatialCrossResponseNormalization(5,0.0001,0.75,1))
-  
-  features:add(backend.SpatialConvolution(256,384,3,3,1,1,1,1,1))
-  features:add(backend.ReLU(true))
+-- SHARED PART
+  local shared   = nn.Sequential()
 
-  features:add(backend.SpatialConvolution(384,384,3,3,1,1,1,1,2))
-  features:add(backend.ReLU(true))
+  shared:add(backend.SpatialConvolution(3,96,11,11,4,4,5,5,1))
+  shared:add(backend.ReLU(true))
+  shared:add(backend.SpatialMaxPooling(3,3,2,2,1,1))
+  shared:add(inn.SpatialCrossResponseNormalization(5,0.0001,0.75,1))
   
-  features:add(backend.SpatialConvolution(384,256,3,3,1,1,1,1,2))
-  features:add(backend.ReLU(true))
-  --features:add(backend.SpatialMaxPooling(3,3,2,2,1,1))
+  shared:add(backend.SpatialConvolution(96,256,5,5,1,1,1,1,2))
+  shared:add(backend.ReLU(true))
+  shared:add(backend.SpatialMaxPooling(3,3,2,2,1,1))
+  shared:add(inn.SpatialCrossResponseNormalization(5,0.0001,0.75,1))
   
-  classifier:add(nn.Linear(9216,4096))
-  classifier:add(backend.ReLU(true))
-  classifier:add(nn.Dropout(0.5))
+  shared:add(backend.SpatialConvolution(256,384,3,3,1,1,1,1,1))
+  shared:add(backend.ReLU(true))
 
-  classifier:add(nn.Linear(4096,4096))
-  classifier:add(backend.ReLU(true))
-  classifier:add(nn.Dropout(0.5))
+  shared:add(backend.SpatialConvolution(384,384,3,3,1,1,1,1,2))
+  shared:add(backend.ReLU(true))
   
-  classifier:add(nn.Linear(4096,21))
+  shared:add(backend.SpatialConvolution(384,256,3,3,1,1,1,1,2))
+  shared:add(backend.ReLU(true))
 
-  local prl = nn.ParallelTable()
-  prl:add(features)
-  prl:add(nn.Identity())
+  -- Convolutions and roi info
+  local shared_roi_info = nn.ParallelTable()
+  shared_roi_info:add(shared)
+  shared_roi_info:add(nn.Identity())
   
+  -- Linear Part
+  local linear = nn.Sequential()
+  linear:add(nn.View(-1):setNumInputDims(3))
+  linear:add(nn.Linear(9216,4096))
+  linear:add(backend.ReLU(true))
+  linear:add(nn.Dropout(0.5))
+
+  linear:add(nn.Linear(4096,4096))
+  linear:add(backend.ReLU(true))
+  linear:add(nn.Dropout(0.5))
+  
+
+  -- classifier
+  local classifier = nn.Linear(4096,21)
+
+  -- regressor
+  local regressor = nn.Linear(4096,84)
+
+
+  local output = nn.ConcatTable()
+  output:add(classifier)
+  output:add(regressor)
+
+
+  
+
+  -- ROI pooling
   local ROIPooling = nnf.ROIPooling(6,6):setSpatialScale(1/16)
 
+
+  -- Whole Model
   local model = nn.Sequential()
-  model:add(prl)
+  model:add(shared_roi_info)
   model:add(ROIPooling)
-  model:add(nn.View(-1):setNumInputDims(3))
-  model:add(classifier)
+  model:add(linear)
+  model:add(output)
   
     
-  local lparams = model:parameters()
+  -- local lparams = model:parameters()
   
-  assert(#lparams == #params, 'provided parameters does not match')
+  -- assert(#lparams == #params, 'provided parameters does not match')
   
-  for k,v in ipairs(lparams) do
-    local p = params[k]
-    assert(p:numel() == v:numel(), 'wrong number of parameter elements !')
-    v:copy(p)
-  end
+  -- for k,v in ipairs(lparams) do
+  --   local p = params[k]
+  --   assert(p:numel() == v:numel(), 'wrong number of parameter elements !')
+  --   v:copy(p)
+  -- end
   
   return model
 end
