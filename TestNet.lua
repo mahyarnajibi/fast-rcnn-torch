@@ -5,10 +5,9 @@ require 'inn'
 require 'nn'
 
 -- load pre-trained Fast-RCNN model
-local debugger = require('fb.debugger')
-debugger.enter()
+debugger = require('fb.debugger')
 
-params = torch.load('data/models/frcnn_alexnet.t7')
+params = torch.load('data/models/fast_rcnn_alexnet.t7')
 loadModel = dofile 'models/frcnn_alexnet.lua'
 model = loadModel(params)
 
@@ -23,7 +22,7 @@ image_transformer= nnf.ImageTransformer{mean_pix={102.9801,115.9465,122.7717},
                                         swap = {3,2,1}}
 feat_provider = nnf.FRCNN{image_transformer=image_transformer}
 feat_provider:evaluate() -- testing mode
-
+debugger.enter()
 detector = nnf.ImageDetect(model, feat_provider)
 
 -- Load an image

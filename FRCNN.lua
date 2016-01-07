@@ -27,7 +27,6 @@ local initcheck = argcheck{
 
 
 function FRCNN:__init(...)
-
   local opts = initcheck(...)
   for k,v in pairs(opts) do self[k] = v end
 
@@ -191,7 +190,7 @@ function FRCNN:bbox_decode(boxes,box_deltas)
   local pred_boxes = torch.Tensor(box_deltas:size())
   local widths = boxes[{{},{3}}] - boxes[{{},{1}}] + eps
   local heights = boxes[{{},{4}}] - boxes[{{},{2}}] + eps
-  local centers_x = boxes[{{},{1}] + 0.5 * widths
+  local centers_x = boxes[{{},{1}}] + 0.5 * widths
   local centers_y = boxes[{{},{3}}] + 0.5 * heights
 
   local x_inds = torch.range(1,box_deltas:size()[2],4):long()
@@ -217,4 +216,30 @@ function FRCNN:bbox_decode(boxes,box_deltas)
   predicted_boxes:indexCopy(2,h_inds,predicted_h)
 
   return predicted_boxes
+end
+
+
+function FRCNN:_clip(boxes,im_size)
+    local x1_inds = torch.range(1,boxes:size()[2],4):long()
+    local y1_inds = torch.range(2,boxes:size()[2],4):long()
+    local x2_inds = torch.range(3,boxes:size()[2],4):long()
+    local y2_inds = torch.range(4,boxes:size()[2],4):long()
+
+
+    local x1 = boxes:index(2,x1_inds)
+    local y1 = boxes:index(2,y1_inds)
+    local x2 = boxes:index(2,x2_inds)
+    local y2 = boxes:index(2,y2_inds)
+
+    x1[x1:lt(0)] = 0
+    y1[y1:lt(0)] = 0
+    x2[x2:gt(im_size[1])] = im_size[1]
+    y2[y2:gt(im_size[2])] = im_size[2]
+
+    boxes:indexCopy(2,x1_inds,x1)
+    boxes:indexCopy(2,y1_inds,y1)
+    boxes:indexCopy(2,x2_inds,x2)
+    boxes:indexCopy(2,y2_inds,y2)
+
+    return boxes
 end
