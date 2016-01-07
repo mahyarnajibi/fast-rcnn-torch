@@ -169,11 +169,13 @@ function FRCNN:postProcess(im,boxes,output)
   return output,boxes
 end
 
+
 function FRCNN:compute(model, inputs)
   local ttype = model.output:type() -- fix when doing bbox regression
   self.inputs,inputs = recursiveResizeAsCopyTyped(self.inputs,inputs,ttype)
   return model:forward(self.inputs)
 end
+
 
 function FRCNN:__tostring()
   local str = torch.type(self)
@@ -184,14 +186,15 @@ function FRCNN:__tostring()
 end
 
 
-function FRCNN:bbox_decode(boxes,box_deltas)
+function FRCNN:bbox_decode(boxes,box_deltas,im_size)
   -- Function to decode the output of the network
+  debugger.enter()
   local eps = 1e-14
   local pred_boxes = torch.Tensor(box_deltas:size())
   local widths = boxes[{{},{3}}] - boxes[{{},{1}}] + eps
   local heights = boxes[{{},{4}}] - boxes[{{},{2}}] + eps
-  local centers_x = boxes[{{},{1}}] + 0.5 * widths
-  local centers_y = boxes[{{},{3}}] + 0.5 * heights
+  local centers_x = boxes[{{},{1}}] + widths:mul(0.5)
+  local centers_y = boxes[{{},{3}}] + heights:mul(0.5)
 
   local x_inds = torch.range(1,box_deltas:size()[2],4):long()
   local y_inds = torch.range(2,box_deltas:size()[2],4):long()
@@ -204,35 +207,36 @@ function FRCNN:bbox_decode(boxes,box_deltas)
   local dh = box_deltas:index(2,h_inds)
 
 
-  local predicted_center_x = dx * widths:expand(dx:size()) + centers_x:expand(dx:size())
-  local predicted_center_y = dy * heights:expand(dy:size()) + centers_y:expand(dy:size())
-  local predicted_w = torch.exp(dw) * widths:expand(dw:size())
-  local predicted_h = torch.exp(dh) * heights:expand(dh:size())
+  local predicted_center_x = dx:cmul(widths:expand(dx:size())) + centers_x:expand(dx:size())
+  local predicted_center_y = dy:cmul(heights:expand(dy:size())) + centers_y:expand(dy:size())
+  local predicted_w = torch.exp(dw):cmul(widths:expand(dw:size()))
+  local predicted_h = torch.exp(dh):cmul(heights:expand(dh:size()))
 
   local predicted_boxes = torch.Tensor(box_deltas:size())
   predicted_boxes:indexCopy(2,x_inds,predicted_center_x)
   predicted_boxes:indexCopy(2,y_inds,predicted_center_y)
   predicted_boxes:indexCopy(2,w_inds,predicted_w)
   predicted_boxes:indexCopy(2,h_inds,predicted_h)
+  predicted_boxes = FRCNN:_clip(predicted_boxes,im_size)
 
   return predicted_boxes
 end
 
 
 function FRCNN:_clip(boxes,im_size)
+
     local x1_inds = torch.range(1,boxes:size()[2],4):long()
     local y1_inds = torch.range(2,boxes:size()[2],4):long()
     local x2_inds = torch.range(3,boxes:size()[2],4):long()
     local y2_inds = torch.range(4,boxes:size()[2],4):long()
-
 
     local x1 = boxes:index(2,x1_inds)
     local y1 = boxes:index(2,y1_inds)
     local x2 = boxes:index(2,x2_inds)
     local y2 = boxes:index(2,y2_inds)
 
-    x1[x1:lt(0)] = 0
-    y1[y1:lt(0)] = 0
+    x1[x1:lt(1)] = 1
+    y1[y1:lt(1)] = 1
     x2[x2:gt(im_size[1])] = im_size[1]
     y2[y2:gt(im_size[2])] = im_size[2]
 
