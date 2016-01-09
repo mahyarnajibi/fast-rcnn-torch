@@ -11,7 +11,7 @@ params = torch.load('data/models/fast_rcnn_alexnet.t7')
 loadModel = dofile 'models/frcnn_alexnet.lua'
 model = loadModel(params)
 
-model:add(nn.SoftMax())
+
 
 model:evaluate()
 model:cuda()

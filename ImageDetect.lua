@@ -13,10 +13,11 @@ function ImageDetect:detect(im,boxes)
 
   local inputs = feat_provider:getFeature(im,boxes)
 
-  local output0 = feat_provider:compute(self.model, inputs)
-  local output,boxes_p = feat_provider:postProcess(im,boxes,output0)
-  --self.sm:forward(output0)
+  local scores,bbox_deltas = feat_provider:compute(self.model, inputs)
+  debugger.enter()
+  local predicted_boxes = feat_provider:bbox_decode(boxes,bbox_deltas,{im:size()[2],im:size()[3]})
+  -- self.sm:forward(output0)
 
-  self.output,output = recursiveResizeAsCopyTyped(self.output,output,'torch.FloatTensor')
-  return self.output,boxes_p
+  self.scores,scores = recursiveResizeAsCopyTyped(self.scores,scores,'torch.FloatTensor')
+  return self.scores,predicted_boxes
 end

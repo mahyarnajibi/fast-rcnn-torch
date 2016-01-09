@@ -69,6 +69,7 @@ function FRCNN:processImages(input_imgs,do_flip)
     if flip then
       im = image.hflip(im)
     end
+
     local im_size = im[1]:size()
     local im_size_min = math.min(im_size[1],im_size[2])
     local im_size_max = math.max(im_size[1],im_size[2])
@@ -159,7 +160,6 @@ function FRCNN:getFeature(imgs,bboxes,flip)
 
   local im_scales, im_sizes = self:processImages(imgs,flip)
   self:projectImageROIs(bboxes,im_scales,flip,im_sizes)
-  
   return self._feat
 end
 
@@ -171,9 +171,14 @@ end
 
 
 function FRCNN:compute(model, inputs)
-  local ttype = model.output:type() -- fix when doing bbox regression
-  self.inputs,inputs = recursiveResizeAsCopyTyped(self.inputs,inputs,ttype)
-  return model:forward(self.inputs)
+  --local ttype = model.output:type() -- fix when doing bbox regression
+  self.inputs,inputs = recursiveResizeAsCopyTyped(self.inputs,inputs,'torch.CudaTensor')
+  -- -- FOR DEBUG
+  -- local temp_inp = matio.load('./demo/net_input.mat')
+  -- self.inputs[1][{{},{1}}] = 1 
+  -- local temp_out = model:forward({temp_inp['im']:cuda(),temp_inp['rois']:cuda()})
+  local out = model:forward(self.inputs)
+  return out[1],out[2]
 end
 
 
@@ -188,13 +193,17 @@ end
 
 function FRCNN:bbox_decode(boxes,box_deltas,im_size)
   -- Function to decode the output of the network
-  debugger.enter()
   local eps = 1e-14
-  local pred_boxes = torch.Tensor(box_deltas:size())
-  local widths = boxes[{{},{3}}] - boxes[{{},{1}}] + eps
-  local heights = boxes[{{},{4}}] - boxes[{{},{2}}] + eps
-  local centers_x = boxes[{{},{1}}] + widths:mul(0.5)
-  local centers_y = boxes[{{},{3}}] + heights:mul(0.5)
+  -- Check to see whether boxes are empty or not 
+  if boxes:size()[1] == 0 then
+    return torch.Tensor(0,boxes:size()[2]):zero()
+  end
+  debugger.enter()
+  box_deltas = box_deltas:double()
+  local widths = boxes[{{},{3}}]:double() - boxes[{{},{1}}]:double() + eps
+  local heights = boxes[{{},{4}}]:double() - boxes[{{},{2}}]:double() + eps
+  local centers_x = boxes[{{},{1}}]:double() + widths * 0.5
+  local centers_y = boxes[{{},{2}}]:double() + heights * 0.5
 
   local x_inds = torch.range(1,box_deltas:size()[2],4):long()
   local y_inds = torch.range(2,box_deltas:size()[2],4):long()
@@ -212,11 +221,13 @@ function FRCNN:bbox_decode(boxes,box_deltas,im_size)
   local predicted_w = torch.exp(dw):cmul(widths:expand(dw:size()))
   local predicted_h = torch.exp(dh):cmul(heights:expand(dh:size()))
 
-  local predicted_boxes = torch.Tensor(box_deltas:size())
-  predicted_boxes:indexCopy(2,x_inds,predicted_center_x)
-  predicted_boxes:indexCopy(2,y_inds,predicted_center_y)
-  predicted_boxes:indexCopy(2,w_inds,predicted_w)
-  predicted_boxes:indexCopy(2,h_inds,predicted_h)
+  local predicted_boxes = torch.Tensor(box_deltas:size()):zero()
+  local half_w = predicted_w * 0.5
+  local half_h = predicted_h * 0.5
+  predicted_boxes:indexCopy(2,x_inds,predicted_center_x - half_w)
+  predicted_boxes:indexCopy(2,y_inds,predicted_center_y -  half_h)
+  predicted_boxes:indexCopy(2,w_inds,predicted_center_x + half_w)
+  predicted_boxes:indexCopy(2,h_inds,predicted_center_y + half_h)
   predicted_boxes = FRCNN:_clip(predicted_boxes,im_size)
 
   return predicted_boxes
