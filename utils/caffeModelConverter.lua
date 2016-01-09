@@ -13,7 +13,6 @@ end
 function caffeModelConverter:convert()
 	
 	-- Reading Torch Model
-	debugger.enter()
 	local torchmodel = dofile(self.torchmodel_path)()
 
 
@@ -22,6 +21,7 @@ function caffeModelConverter:convert()
 	local model = weightloader:load()
 
 	-- Saving torch model
+	debugger.enter()
 	torch.save(self.save_path..self.model_name, model)
 
 

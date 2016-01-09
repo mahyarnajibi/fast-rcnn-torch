@@ -1,4 +1,4 @@
-local function loadModel()
+local function loadModel(params)
 
   backend = backend or cudnn
 
@@ -13,12 +13,12 @@ local function loadModel()
 
   shared:add(backend.SpatialConvolution(3,96,11,11,4,4,5,5,1))
   shared:add(backend.ReLU(true))
-  shared:add(backend.SpatialMaxPooling(3,3,2,2,1,1))
+  shared:add(backend.SpatialMaxPooling(3,3,2,2,1,1):ceil())
   shared:add(inn.SpatialCrossResponseNormalization(5,0.0001,0.75,1))
   
-  shared:add(backend.SpatialConvolution(96,256,5,5,1,1,1,1,2))
+  shared:add(backend.SpatialConvolution(96,256,5,5,1,1,2,2,2))
   shared:add(backend.ReLU(true))
-  shared:add(backend.SpatialMaxPooling(3,3,2,2,1,1))
+  shared:add(backend.SpatialMaxPooling(3,3,2,2,1,1):ceil())
   shared:add(inn.SpatialCrossResponseNormalization(5,0.0001,0.75,1))
   
   shared:add(backend.SpatialConvolution(256,384,3,3,1,1,1,1,1))
@@ -47,8 +47,11 @@ local function loadModel()
   linear:add(nn.Dropout(0.5))
   
 
+
   -- classifier
-  local classifier = nn.Linear(4096,21)
+
+  local classifier = nn.Sequential()
+  classifier:add(nn.Linear(4096,21)):add(backend.SoftMax())
 
   -- regressor
   local regressor = nn.Linear(4096,84)
@@ -64,7 +67,6 @@ local function loadModel()
   -- ROI pooling
   local ROIPooling = nnf.ROIPooling(6,6):setSpatialScale(1/16)
 
-
   -- Whole Model
   local model = nn.Sequential()
   model:add(shared_roi_info)
@@ -72,17 +74,10 @@ local function loadModel()
   model:add(linear)
   model:add(output)
   
-    
-  -- local lparams = model:parameters()
-  
-  -- assert(#lparams == #params, 'provided parameters does not match')
-  
-  -- for k,v in ipairs(lparams) do
-  --   local p = params[k]
-  --   assert(p:numel() == v:numel(), 'wrong number of parameter elements !')
-  --   v:copy(p)
-  -- end
-  
+
+  -- Copying parameters
+  model:getParameters():copy(params)
+
   return model
 end
 
