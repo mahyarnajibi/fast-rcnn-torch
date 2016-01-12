@@ -1,4 +1,5 @@
 local matio = require 'matio'
+local io = require 'io'
 local argcheck = dofile'argcheck.lua'--require 'argcheck'
 local xml = require 'xml'
 local utilities = detection.GeneralUtils()
@@ -164,6 +165,50 @@ function DataSetPascal:__init(...)
   self.sizes = torch.IntTensor(self.sizes)
   ]]
   
+end
+
+function DataSetPascal:_write_detections(all_detections)
+  -- write detectuions for the external matlab devkit
+  local comp_id = 'comp4'
+  local save_path = config.dataset_path .. '/' .. config.dataset .. '/results/VOC' .. self.year .. '/Main/' .. comp_id .. '_'
+  for cls_id,cls_name in ipairs(self.classes) do
+    print('Writing detections for '.. cls_name)
+    local file_path = save_path .. 'det_' .. self.image_set .. '_' .. cls_name .. '.txt'
+    -- open file
+    local file = io.open(file_path,'w')
+    for i = 1,self:size() do
+      local cur_img = self.img_ids[i]
+      local detections = all_detections[cls_id][i]
+
+      if detections:numel() ~= 0 then
+        local n_det = detections:size(1)
+        for d = 1,n_det do
+          file:write(string.format('%s %.3f %.1f %.1f %.1f %.1f\n',
+            cur_img, detections[d][-1], detections[d][1], detections[d][2], detections[d][3], detections[d][4]))
+
+        end
+      end
+    end
+  file:close()
+  end
+  
+end
+
+function DataSetPascal:evaluate(all_detections)
+  -- write detections
+  debugger.enter()
+  self:_write_detections(all_detections)
+  -- Here we use the matlab evaluation kit
+  local comp_id = 'comp4'
+  local matlab_fun_path = './utils/VOCdevkit-matlab-wrapper'
+
+  -- Generating the matlab terminal command
+  local cmd = 'cd ' .. matlab_fun_path .. '&& ' ..
+  'matlab -nodisplay -nodesktop '.. '-r "'..
+  string.format('voc_eval(\'%s\',\'%s\',\'%s\',\'%s\',%d); quit;"', '../../' .. config.dataset_path .. '/' .. config.dataset,
+    comp_id,self.image_set, '../../cache',0)
+  print(cmd)
+  os.execute(cmd)
 end
 
 function DataSetPascal:size()
