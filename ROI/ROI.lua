@@ -107,8 +107,8 @@ function ROI:_clip(boxes,im_size)
 
     x1[x1:lt(1)] = 1
     y1[y1:lt(1)] = 1
-    x2[x2:gt(im_size[1])] = im_size[1]
-    y2[y2:gt(im_size[2])] = im_size[2]
+    x2[x2:gt(im_size[2])] = im_size[2]
+    y2[y2:gt(im_size[1])] = im_size[1]
 
     boxes:indexCopy(2,x1_inds,x1)
     boxes:indexCopy(2,y1_inds,y1)
