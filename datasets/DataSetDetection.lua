@@ -1,6 +1,4 @@
 local utilities = detection.GeneralUtils()
-local concat = utilities.concat
-local boxoverlap = utilities.boxoverlap
 
 local DataSetDetection = torch.class('detection.DataSetDetection')
 DataSetDetection._isDataSet = true
@@ -28,6 +26,9 @@ function DataSetDetection:size()
   return #self.img_ids
 end
 
+function DataSetDetection:evaluate()
+end
+
 function DataSetDetection:__tostring__()
   local str = torch.type(self)
   str = str .. '\n  Dataset Name: ' .. self.dataset_name
@@ -46,7 +47,7 @@ function DataSetDetection:bestOverlap(all_boxes, gt_boxes, gt_classes)
   local overlap_class = torch.FloatTensor(num_total_boxes,self.num_classes):zero()
   local overlap = torch.FloatTensor(num_total_boxes,num_gt_boxes):zero()
   for idx=1,num_gt_boxes do
-    local o = boxoverlap(all_boxes,gt_boxes[idx])
+    local o = utilities:boxoverlap(all_boxes,gt_boxes[idx])
     local tmp = overlap_class[{{},gt_classes[idx]}] -- pointer copy
     tmp[tmp:lt(o)] = o[tmp:lt(o)]
     overlap[{{},idx}] = o
@@ -74,13 +75,13 @@ function DataSetDetection:attachProposals(i)
   local boxes = self:getROIBoxes(i)
   local gt_boxes,gt_classes,valid_objects,anno = self:getGTBoxes(i)
 
-  local all_boxes = concat(gt_boxes,boxes,1)
+  local all_boxes = utilities:concat(gt_boxes,boxes,1)
 
   local num_boxes = boxes:dim() > 0 and boxes:size(1) or 0
   local num_gt_boxes = #gt_classes
   
   local rec = {}
-  rec.gt = concat(torch.ByteTensor(num_gt_boxes):fill(1),
+  rec.gt = utilities:concat(torch.ByteTensor(num_gt_boxes):fill(1),
                   torch.ByteTensor(num_boxes):fill(0)    )
   
   rec.overlap, rec.correspondance, rec.overlap_class =
@@ -94,7 +95,7 @@ function DataSetDetection:attachProposals(i)
   end
   
   rec.boxes = all_boxes
-  rec.class = concat(torch.CharTensor(gt_classes),
+  rec.class = utilities:concat(torch.CharTensor(gt_classes),
                      torch.CharTensor(num_boxes):fill(0))
 
   if self.save_objs then
