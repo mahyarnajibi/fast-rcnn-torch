@@ -160,6 +160,8 @@ end
 
 --------------------------------------------------------------------------------
 
+
+
 function GeneralUtils:VOCevaldet(dataset,scored_boxes,cls)
   local num_pr = 0
   local energy = {}
@@ -167,7 +169,7 @@ function GeneralUtils:VOCevaldet(dataset,scored_boxes,cls)
   
   local count = 0
   
-  for i=1,dataset:size() do   
+  for i=1, dataset:size() do   
     local ann = dataset:getAnnotation(i)   
     local bbox = {}
     local det = {}
@@ -182,7 +184,7 @@ function GeneralUtils:VOCevaldet(dataset,scored_boxes,cls)
     
     bbox = torch.Tensor(bbox)
     det = torch.Tensor(det)
-    
+
     local num = scored_boxes[i]:numel()>0 and scored_boxes[i]:size(1) or 0
     for j=1,num do
       local bbox_pred = scored_boxes[i][j]
@@ -190,7 +192,7 @@ function GeneralUtils:VOCevaldet(dataset,scored_boxes,cls)
       table.insert(energy,bbox_pred[5])
       
       if bbox:numel()>0 then
-        local o = boxoverlap(bbox,bbox_pred[{{1,4}}])
+        local o = self:boxoverlap(bbox,bbox_pred[{{1,4}}])
         local maxo,index = o:max(1)
         maxo = maxo[1]
         index = index[1]
@@ -239,7 +241,7 @@ function GeneralUtils:VOCevaldet(dataset,scored_boxes,cls)
       recall[i] = num_correct / count
   end
 
-  ap = VOCap(recall, precision)
+  ap = self:VOCap(recall, precision)
   io.write(('AP = %.4f\n'):format(ap));
 
   return ap, recall, precision
@@ -434,4 +436,28 @@ function GeneralUtils:visualize_detections(im,boxes,scores,thresh,cl_names)
   w:setlinewidth(2)
   w:stroke()
   return w
+end
+
+
+
+function GeneralUtils:print_scores(dataset,res)
+  print('Results:')
+  -- print class names
+  io.write('|')
+  for i = 1, dataset.num_classes do
+    io.write(('%5s|'):format(dataset.classes[i]))
+  end
+  io.write('\n|')
+  -- print class scores
+  for i = 1, dataset.num_classes do
+    local l = #dataset.classes[i] < 5 and 5 or #dataset.classes[i]
+    local l = res[i] == res[i] and l-5 or l-3
+    if l > 0 then
+      io.write(('%.3f%'..l..'s|'):format(res[i],' '))
+    else
+      io.write(('%.3f|'):format(res[i]))
+    end
+  end
+  io.write('\n')
+  io.write(('mAP: %.4f\n'):format(res:mean(1)[1]))
 end
