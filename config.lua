@@ -22,8 +22,12 @@ function config.parse(arg)
 	cmd:option('-nms', 0.3, 'Overlap threshold used for non-maximum suppression (suppress boxes with IoU >= this val)')
 	cmd:option('-pixel_means', {102.9801,115.9465,122.7717}, 'Pixel mean values (BGR order)')
 	cmd:option('-eps', 1e-14, 'Epsilon')
-	cmd:option('-log_path','./cache/','Path used for saving log data')
-
+	cmd:option('-log_path','./cache','Path used for saving log data')
+	cmd:option('-dataset','voc_2007','Dataset used for training')
+	cmd:option('-dataset_path','data/datasets','Path to the dataset main folder')
+	cmd:option('-test_img_set','test','Image set to be used for testing')
+	cmd:option('-train_img_set','trainval','Image set to be used for test')
+	cmd:option('-cache','./cache','Directory used for saving cache data')
 	-- Parsing the command line 
 	config = cmd:parse(arg or {})
 
