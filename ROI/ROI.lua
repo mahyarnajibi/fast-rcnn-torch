@@ -85,7 +85,7 @@ function ROI:_get_targets(roidb_entry)
     -- Concat regression targets with their labels
     debugger.enter()
     local selected_labels = roidb_entry.label:index(1,selected_ids):double()
-    targets:indexCopy(1,selected_ids,torch.cat(encoded_selected_targets,selected_labels))
+    targets:indexCopy(1,selected_ids,torch.cat(selected_labels,encoded_selected_targets))
 
 
     return targets
