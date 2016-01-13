@@ -36,6 +36,12 @@ function GeneralUtils:joinTable(input,dim)
   return output
 end
 
+
+function GeneralUtils:logical2ind(logical)
+  return torch.range(1,logical:numel())[logical:eq(1)]:long()
+end
+
+
 function GeneralUtils:recursiveResizeAsCopyTyped(t1,t2,type)
   if torch.type(t2) == 'table' then
     t1 = (torch.type(t1) == 'table') and t1 or {t1}
