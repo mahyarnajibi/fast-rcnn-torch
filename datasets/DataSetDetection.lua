@@ -109,6 +109,7 @@ function DataSetDetection:attachProposals(i)
     return (num_boxes+num_gt_boxes)
   end
   
+  rec.image_path = string.format(self.imgpath,self.img_ids[i])
   return rec
 end
 
