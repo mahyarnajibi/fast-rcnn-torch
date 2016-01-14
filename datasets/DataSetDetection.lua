@@ -13,6 +13,9 @@ end
 function DataSetDetection:getImage(i)
 end
 
+function DataSetDetection:getImageSize(i)
+end
+
 function DataSetDetection:getAnnotation(i)
 end
 
@@ -26,8 +29,14 @@ function DataSetDetection:size()
   return #self.img_ids
 end
 
+function DataSetDetection:nclass()
+
+end
+
 function DataSetDetection:evaluate()
 end
+
+
 
 function DataSetDetection:__tostring__()
   local str = torch.type(self)
@@ -98,6 +107,8 @@ function DataSetDetection:attachProposals(i)
   rec.class = utilities:concat(torch.CharTensor(gt_classes),
                      torch.CharTensor(num_boxes):fill(0))
 
+
+
   if self.save_objs then
     rec.objects = {}
     for _,idx in pairs(valid_objects) do
@@ -109,7 +120,11 @@ function DataSetDetection:attachProposals(i)
     return (num_boxes+num_gt_boxes)
   end
   
+  rec.image_size = self:getImageSize(i)
+
+  rec.flipped = false
   rec.image_path = string.format(self.imgpath,self.img_ids[i])
+
   return rec
 end
 
