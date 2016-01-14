@@ -47,6 +47,11 @@ function ROI:bbox_decode(boxes,box_deltas,im_size)
   return predicted_boxes
 end
 
+function ROI:get_roidb()
+  return self._roidb
+end
+
+
 function ROI:create_roidb(db)
   -- Function that creates the roidb needed for training
     for i = 1,db:size() do
@@ -54,11 +59,70 @@ function ROI:create_roidb(db)
       self._roidb[i] = db:attachProposals(i)  
     end
 
+    if config.use_flipped then
+      self:_add_flipped()
+    end
+
     -- Add targets
     self:_add_targets()
+    -- Computing mean and stds for the targets
+    local n_class = db:nclass()
+    local counts = torch.zeros(n_class,1) + config.eps
+    local means = torch.zeros(n_class,4)
+    local stds = torch.zeros(n_class,4)
+
+    for i=1,#self._roidb do
+      local cur_targets = self._roidb[i].targets[{{},{2,5}}]
+       local cur_labels = self._roidb[i].targets[{{},{1}}]
+      for c = 1, n_class do
+        local c_inds = utils:logical2ind(cur_labels:eq(c))
+        if c_inds:numel()>0 then
+          counts[c] = counts[c]+ c_inds:numel()
+          means[c] = means[c] + cur_targets:index(1,c_inds):sum(1)
+          stds[c] = stds[c] + cur_targets:index(1,c_inds):pow(2):sum(1)
+        end
+      end
+    end
+
+    means:cdiv(counts:expand(means:size()))
+    stds= (stds:cdiv(counts:expand(stds:size())) - torch.pow(means,2)):sqrt()
+
+    -- Do the normalization
+    for i=1,#self._roidb do
+      local cur_targets = self._roidb[i].targets[{{},{2,5}}]
+      local cur_labels = self._roidb[i].targets[{{},{1}}]
+      for c = 1,n_class do
+        c_inds = utils:logical2ind(cur_labels:eq(c))
+        if c_inds:numel()>0 then
+          cur_targets:indexCopy(1,c_inds,cur_targets:index(1,c_inds) - means[c]:resize(1,means[c]:numel()):expand(torch.LongStorage{c_inds:numel(),means:size(2)}))
+          cur_targets:indexCopy(1,c_inds,cur_targets:index(1,c_inds):cdiv(stds[c]:resize(1,stds[c]:numel()):expand(torch.LongStorage{c_inds:numel(),means:size(2)})))
+        end
+      end
+    end
+    -- Return the computed mean and std for reverting the normalization in further computations
+    return means,stds
 end
 
+
+
+function ROI:_add_flipped()
+  local n_recs = #self._roidb
+  for i=1,n_recs do
+    local cur_roidb = self._roidb[i]
+    local new_rec = utils:tableDeepCopy(cur_roidb)
+    -- Adjust the coordinates
+    local width = cur_roidb.image_size[1]
+    new_rec.boxes[{{},{1}}] = -(cur_roidb.boxes[{{},{3}}]-width) + 1
+    new_rec.boxes[{{},{3}}] = -(cur_roidb.boxes[{{},{1}}]-width) + 1
+    new_rec.flipped = true
+    table.insert(self._roidb,new_rec)
+  end
+
+end
+
+
 function ROI:_add_targets()
+
   for i=1,#self._roidb do
     self._roidb[i].targets = self:_get_targets(self._roidb[i])
   end
@@ -67,12 +131,13 @@ end
 
 function ROI:_get_targets(roidb_entry)
     -- This function determines targets for the bounding boxes
-    
+
     local boxes = roidb_entry.boxes:float()
     local gt_boxes = boxes:index(1,utils:logical2ind(roidb_entry.gt))
     local max_overlaps = roidb_entry.overlap
 
     local selected_ids = utils:logical2ind(max_overlaps:ge(config.bbox_threshold))
+    assert(selected_ids:numel() > 0,'There is no ground truth box in one of the images!')
     local selected_boxes = boxes:index(1,selected_ids)
 
     -- Determine Targets
@@ -83,9 +148,8 @@ function ROI:_get_targets(roidb_entry)
     local encoded_selected_targets = self:_bbox_encode(selected_boxes,target_gts)
 
     -- Concat regression targets with their labels
-    debugger.enter()
     local selected_labels = roidb_entry.label:index(1,selected_ids):double()
-    targets:indexCopy(1,selected_ids,torch.cat(selected_labels,encoded_selected_targets))
+    targets:indexCopy(1,selected_ids,torch.cat(selected_labels,encoded_selected_targets,2))
 
 
     return targets
