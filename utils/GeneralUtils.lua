@@ -36,9 +36,16 @@ function GeneralUtils:joinTable(input,dim)
   return output
 end
 
+function GeneralUtils:tableDeepCopy(tab)
+  if type(tab)=='userdata' and tab.clone ~= nil then return tab:clone() end -- for dealing with tensors
+  if type(tab) ~= 'table' then return tab end
+  local res = setmetatable({}, getmetatable(tab))
+  for k, v in pairs(tab) do res[self:tableDeepCopy(k)] = self:tableDeepCopy(v) end
+  return res
+end
 
 function GeneralUtils:logical2ind(logical)
-  return torch.range(1,logical:numel())[logical:eq(1)]:long()
+  return torch.range(1,logical:numel())[logical:gt(0)]:long()
 end
 
 
