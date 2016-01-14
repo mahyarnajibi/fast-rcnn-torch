@@ -22,9 +22,11 @@ local ss_file =  ss_dir .. dataset_name .. '_' .. image_set .. '.mat'
 -- Loading dataset
 local dataset = detection.DataSetPascal({image_set = image_set, datadir = dataset_dir, roidbdir = ss_dir , roidbfile = ss_file})
 -- Loading roidb
-dataset:loadROIDB()
+--dataset:loadROIDB()
+-- roidb = detection.ROI()
 
-
+-- bbox_means,bbox_stds = roidb:create_roidb(dataset)
+-- debugger.enter()
 -- Creating the network and its wrapper
 local param_path = 'data/models/torch_fast_rcnn_models/CaffeNet/FRCNN_CaffeNet.t7'
 local model_path = 'models/CaffeNet/FRCNN.lua'
@@ -33,11 +35,11 @@ local network = detection.Net(model_path,param_path)
 network:get_net():cuda()
 network:get_net():evaluate()
 
-local image_transformer= detection.ImageTransformer{mean_pix={102.9801,115.9465,122.7717},
-                                         raw_scale = 255,
-                                         swap = {3,2,1}}
+--local image_transformer= detection.ImageTransformer{mean_pix={102.9801,115.9465,122.7717},
+--                                         raw_scale = 255,
+--                                         swap = {3,2,1}}
 
-local network_wrapper = detection.NetworkWrapper(network,image_transformer)
+local network_wrapper = detection.NetworkWrapper(network)
 network_wrapper:evaluate()
 
 

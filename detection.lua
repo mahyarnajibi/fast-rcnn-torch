@@ -5,7 +5,7 @@ require('cudnn')
 detection = {}
 
 -- Detection utilities
-torch.include('detection','utils/ImageTransformer.lua')
+torch.include('detection','utils/InputMaker.lua')
 torch.include('detection','utils/CaffeLoader.lua')
 torch.include('detection','utils/CaffeModelConverter.lua')
 torch.include('detection','utils/GeneralUtils.lua')

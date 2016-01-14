@@ -1,5 +1,5 @@
 ROI = torch.class('detection.ROI')
-
+utils = detection.GeneralUtils()
 function ROI:__init()
     self._roidb = {}
 end
@@ -202,7 +202,7 @@ function ROI:_clip(boxes,im_size)
     return boxes
 end
 
-function ROI:projectImageROIs(im_rois,scales,do_flip,imgs_size,train_mode)
+function ROI:projectImageROIs(im_rois,scales,train_mode)
 
   -- we consider two cases:
   -- During training, the scales are sampled randomly per image, so
@@ -224,9 +224,6 @@ function ROI:projectImageROIs(im_rois,scales,do_flip,imgs_size,train_mode)
       local idx = {cumul_bboxes[i]+1,cumul_bboxes[i+1]}
       rois[{idx,1}]:fill(i)
       rois[{idx,{2,5}}]:copy(im_rois[i]):add(-1):mul(scales[i]):add(1)
-      if do_flip and do_flip[i] == 1 then
-        utils:flipBoundingBoxes(rois[{idx,{2,5}}],imgs_size[{i,2}])
-      end
     end
   else -- not yet tested
     error('Multi-scale testing not yet tested')
