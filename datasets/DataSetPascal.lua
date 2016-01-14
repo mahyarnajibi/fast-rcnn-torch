@@ -167,6 +167,15 @@ function DataSetPascal:__init(...)
   
 end
 
+function DataSetPascal:getImageSize(i)
+  local anno = self:getAnnotation(i)
+  return {anno.size.width,anno.size.height}
+end
+
+function DataSetPascal:nclass()
+  return #self.classes
+end
+
 function DataSetPascal:_write_detections(all_detections)
   -- write detectuions for the external matlab devkit
   local comp_id = 'comp4'
@@ -196,7 +205,6 @@ end
 
 function DataSetPascal:evaluate(all_detections)
   -- write detections
-  debugger.enter()
   self:_write_detections(all_detections)
   -- Here we use the matlab evaluation kit
   local comp_id = 'comp4'
@@ -310,7 +318,8 @@ function DataSetPascal:getGTBoxes(i)
     end
   else
     for idx,obj in ipairs(anno.object) do
-      if obj.difficult == '0' and self.class_to_id[obj.name] then
+
+      if self.class_to_id[obj.name] and (config.use_difficult_objs or obj.difficult == 0) then -- even load the difficult ones we need it for training!
         table.insert(valid_objects,idx)
       end
     end
