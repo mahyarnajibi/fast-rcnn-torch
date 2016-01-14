@@ -8,6 +8,7 @@ function config.parse(arg)
 	cmd:text()
 	cmd:text('')
 	-- Parameters
+	cmd:option('-use_difficult_objs', true, 'Whether to load the difficult examples or not')
 	cmd:option('-scale', {600}, 'Scales used for training and testing, currently single scale!')
 	cmd:option('-max_size', 1000, 'Max pixel size of the longest side of a scaled input image')
 	cmd:option('-ims_per_batch', 2, 'Images to use per minibatch')
