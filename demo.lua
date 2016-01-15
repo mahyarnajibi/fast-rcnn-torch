@@ -8,6 +8,8 @@ require 'nn'
 require 'torch'
 require 'detection'
 
+debugger = require 'fb.debugger'
+
 config = dofile 'config.lua'
 config = config.parse(arg)
 utils = detection.GeneralUtils()
@@ -23,11 +25,8 @@ network = detection.Net(model_path,param_path)
 network:get_net():cuda()
 network:get_net():evaluate()
 
-image_transformer= detection.ImageTransformer{mean_pix={102.9801,115.9465,122.7717},
-                                         raw_scale = 255,
-                                         swap = {3,2,1}}
 
-network_wrapper = detection.NetworkWrapper(network,image_transformer)
+network_wrapper = detection.NetworkWrapper(network)
 network_wrapper:evaluate()
 
 
@@ -52,7 +51,6 @@ im = image.load(image_path)
 
 -- detect !
 scores, bboxes = network_wrapper:detect(im, proposals)
-
 
 -- visualization
 threshold = 0.5

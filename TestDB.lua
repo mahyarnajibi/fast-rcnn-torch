@@ -7,6 +7,7 @@ require 'nn'
 require 'torch'
 require 'detection'
 
+
 debugger = require 'fb.debugger'
 config = dofile 'config.lua'
 config = config.parse(arg)
@@ -22,7 +23,7 @@ local ss_file =  ss_dir .. dataset_name .. '_' .. image_set .. '.mat'
 -- Loading dataset
 local dataset = detection.DataSetPascal({image_set = image_set, datadir = dataset_dir, roidbdir = ss_dir , roidbfile = ss_file})
 -- Loading roidb
---dataset:loadROIDB()
+dataset:loadROIDB()
 -- roidb = detection.ROI()
 
 -- bbox_means,bbox_stds = roidb:create_roidb(dataset)

@@ -15,6 +15,7 @@ end
 function NetworkWrapper:evaluate()
   self.train = false
   self.net:get_net():evaluate()
+  config.use_difficult_objs = false
 end
 
 function NetworkWrapper:__tostring()
@@ -28,12 +29,10 @@ end
 
 
 function NetworkWrapper:detect(im,boxes)
-
   local proc_im,proc_boxes,im_scale = InputMaker:process(im,boxes)
   -- Making image 4D and create the input structure
-  local inputs = {proc_im:resize(torch.LongStorage({1,proc_im:size(1),proc_im:size(2),proc_im:size(3)})),proc_boxes}
+  local inputs = {proc_im:view(1,proc_im:size(1),proc_im:size(2),proc_im:size(3)),proc_boxes}
   local scores,bbox_deltas = self.net:forward(inputs)
-  debugger.enter()
   local predicted_boxes = ROI:bbox_decode(boxes,bbox_deltas,{im:size()[2],im:size()[3]})
 
   self.scores,scores = utils:recursiveResizeAsCopyTyped(self.scores,scores,'torch.FloatTensor')
@@ -137,12 +136,11 @@ function NetworkWrapper:testNetwork(db)
   avg_det_time = avg_det_time / n_image
   print(n_image .. ' images detected! ' .. ',average detection time = ' .. avg_det_time .. ', average misc time = ' .. avg_misc_time)
   
-  debugger.enter()
-  local det_save_path = config.cache .. '/' .. db.dataset_name .. '_' .. db.image_set .. '_detections.t7'
-  local thresholds_save_path = config.cache .. '/' .. db.dataset_name .. '_' .. db.image_set .. '_thresholds.t7'
-  torch.save(det_save_path,all_detections)
-  torch.save(thresholds_save_path,thresholds)
-  print('Detections saved into '.. det_save_path)
+  -- local det_save_path = config.cache .. '/' .. db.dataset_name .. '_' .. db.image_set .. '_detections.t7'
+  -- local thresholds_save_path = config.cache .. '/' .. db.dataset_name .. '_' .. db.image_set .. '_thresholds.t7'
+  -- torch.save(det_save_path,all_detections)
+  -- torch.save(thresholds_save_path,thresholds)
+  -- print('Detections saved into '.. det_save_path)
 
   -- prune the detections and apply nms
   for i=1,n_class do
