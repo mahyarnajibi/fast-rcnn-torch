@@ -36,6 +36,11 @@ function GeneralUtils:joinTable(input,dim)
   return output
 end
 
+function GeneralUtils:shuffle(dim,tensor)
+  local randperm = torch.randperm(tensor:size(dim)):long()
+  return tensor:index(dim,randperm)
+end
+
 function GeneralUtils:tableDeepCopy(tab)
   if type(tab)=='userdata' and tab.clone ~= nil then return tab:clone() end -- for dealing with tensors
   if type(tab) ~= 'table' then return tab end

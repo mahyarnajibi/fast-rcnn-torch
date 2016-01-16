@@ -46,7 +46,6 @@ function NetworkWrapper:testNetwork(db)
   local n_image = db:size()
   local n_class = db.num_classes
   db:loadROIDB()
-
   -- heuristics
   local max_per_set = 40* n_image
   local max_per_image = 100

@@ -54,6 +54,7 @@ end
 
 function ROI:create_roidb(db)
   -- Function that creates the roidb needed for training
+    db:loadROIDB()
     for i = 1,db:size() do
       -- Attach proposal information
       self._roidb[i] = db:attachProposals(i)  
