@@ -17,12 +17,24 @@ function Net:load_weight(weight_file_path)
 		self.weight_file_path = weight_file_path
 	end
 
+
 	-- Loading parameters
 	params = torch.load(self.weight_file_path):getParameters()
 	-- Copying parameters
  	self.model:getParameters():copy(params)
-
+ 	self.model:cuda()
+ 	utils:recursiveMakeDataParallel(self.model)
+	--self.model:get(1):get(1) = utils:makeDataParallel(self.model:get(1):get(1),config.nGPU)
  end
+
+
+function Net:training()
+	self.model:training()
+end
+
+function Net:evaluate()
+	self.model:evaluate()
+end
 
 function Net:load_from_caffe(proto_path,caffemodel_path,save_path,model_name)
 	caffeModelLoader = detection.CaffeModelConverter(self.model,proto_path,caffemodel_path,model_name,save_path)
@@ -36,10 +48,6 @@ end
 
 function Net:forward(inputs)
   	self.inputs,inputs = utils:recursiveResizeAsCopyTyped(self.inputs,inputs,'torch.CudaTensor')
-  	-- -- FOR DEBUG
-  	-- local temp_inp = matio.load('./demo/net_input.mat')
-  	-- self.inputs[1][{{},{1}}] = 1 
-  	-- local temp_out = model:forward({temp_inp['im']:cuda(),temp_inp['rois']:cuda()})
   	local out = self.model:forward(self.inputs)
   	return out[1],out[2]
- end
+end
