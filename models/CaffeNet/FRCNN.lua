@@ -1,5 +1,12 @@
 require 'detection'
-
+local utils = detection.GeneralUtils()
+-- To define new models your file should:
+-- 1) return the model
+-- 2) return a local variable named regressor pointing to the weights of the bbox regressor
+-- 3) return a local variable named classifier pointing ro weights of the classifier (without SoftMax!)
+-- 4) return the name of the model (used for saving models and logs)
+  
+  local name = 'frcnn_alexnet'
   backend = backend or cudnn
 
   
@@ -10,8 +17,10 @@ require 'detection'
   
 -- SHARED PART
   local shared   = nn.Sequential()
-
-  shared:add(backend.SpatialConvolution(3,96,11,11,4,4,5,5,1))
+  local conv1 =backend.SpatialConvolution(3,96,11,11,4,4,5,5,1)
+  -- Freeze conv1
+  conv1.accGradParameters = function() end 
+  shared:add(conv1)
   shared:add(backend.ReLU(true))
   shared:add(backend.SpatialMaxPooling(3,3,2,2,1,1):ceil())
   shared:add(inn.SpatialCrossResponseNormalization(5,0.0001,0.75,1))
@@ -29,6 +38,7 @@ require 'detection'
   
   shared:add(backend.SpatialConvolution(384,256,3,3,1,1,1,1,2))
   shared:add(backend.ReLU(true))
+
 
   -- Convolutions and roi info
   local shared_roi_info = nn.ParallelTable()
@@ -49,21 +59,14 @@ require 'detection'
 
 
   -- classifier
-
-  local classifier = nn.Sequential()
-  classifier:add(nn.Linear(4096,21)):add(backend.SoftMax())
-
+  local classifier = nn.Linear(4096,21)
   -- regressor
   local regressor = nn.Linear(4096,84)
-
 
   local output = nn.ConcatTable()
   output:add(classifier)
   output:add(regressor)
-
-
   
-
   -- ROI pooling
   local ROIPooling = detection.ROIPooling(6,6):setSpatialScale(1/16)
 
@@ -73,9 +76,7 @@ require 'detection'
   model:add(ROIPooling)
   model:add(linear)
   model:add(output)
-  
 
 
-
-  return model
+  return model,classifier,regressor,name
 
