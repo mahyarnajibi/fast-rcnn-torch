@@ -1,11 +1,12 @@
 local heap = require 'utils.heap.binary_heap'
-local NetworkWrapper = torch.class('detection.NetworkWrapper')
-utils = detection.GeneralUtils()
-ROI = detection.ROI()
-InputMaker = detection.InputMaker()
+NetworkWrapper = torch.class('detection.NetworkWrapper')
+local utils = detection.GeneralUtils()
+local ROI = detection.ROI()
+local InputMaker = detection.InputMaker()
 function NetworkWrapper:__init(net)
   self.train = true
   self.net = net
+  self._softmax= cudnn.SoftMax():cuda()
 end
 
 function NetworkWrapper:training()
@@ -14,7 +15,7 @@ end
 
 function NetworkWrapper:evaluate()
   self.train = false
-  self.net:get_net():evaluate()
+  self.net:get_model():evaluate()
   config.use_difficult_objs = false
 end
 
@@ -26,28 +27,42 @@ function NetworkWrapper:__tostring()
   return str
 end
 
-
+function NetworkWrapper:trainNetwork(db)
+  db:loadROIDB()
+  local roi = detection.ROI()
+  local bbox_means,bbox_stds = roi:create_roidb(db)
+  if config.nGPU>1 then
+    local parallelTrainer = detection.ParallelTrainer(self.net,nn.CrossEntropyCriterion():cuda(),detection.WeightedSmoothL1Criterion():cuda(),roi)
+  
+    parallelTrainer:train()
+  else
+    local sequentialTrainer = detection.SequentialTrainer(self.net,nn.CrossEntropyCriterion():cuda(),detection.WeightedSmoothL1Criterion():cuda(),roi)
+    sequentialTrainer:train()
+  end
+end
 
 function NetworkWrapper:detect(im,boxes)
+
   local proc_im,proc_boxes,im_scale = InputMaker:process(im,boxes)
   -- Making image 4D and create the input structure
   local inputs = {proc_im:view(1,proc_im:size(1),proc_im:size(2),proc_im:size(3)),proc_boxes}
   local scores,bbox_deltas = self.net:forward(inputs)
+  -- Applying Softmax
+  scores = self._softmax:forward(scores)
   local predicted_boxes = ROI:bbox_decode(boxes,bbox_deltas,{im:size()[2],im:size()[3]})
-
   self.scores,scores = utils:recursiveResizeAsCopyTyped(self.scores,scores,'torch.FloatTensor')
+  
   return self.scores,predicted_boxes
 end
 
 
 function NetworkWrapper:testNetwork(db) 
-
   -- preparing the dataset
   local n_image = db:size()
   local n_class = db.num_classes
   db:loadROIDB()
   -- heuristics
-  local max_per_set = 40* n_image
+  local max_per_set = 40 * n_image
   local max_per_image = 100
   -- make torch and network to work in the evaluate mode
 
@@ -73,6 +88,7 @@ function NetworkWrapper:testNetwork(db)
 
 
   for i=1,n_image do
+
     local im = db:getImage(i)
     -- Get the bounding boxes 
     local bboxes = db:getROIBoxes(i)
@@ -81,6 +97,7 @@ function NetworkWrapper:testNetwork(db)
 
     -- Do the detection
     detect_timer:reset()
+
     local scores,pred_boxes = self:detect(im,bboxes)
     local det_time = detect_timer:time().real
     avg_det_time = avg_det_time + det_time
