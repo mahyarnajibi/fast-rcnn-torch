@@ -54,10 +54,13 @@ end
 
 function ROI:create_roidb(db)
   -- Function that creates the roidb needed for training
+    -- save the name of the database
+    self.db_name = db.dataset_name
     db:loadROIDB()
     for i = 1,db:size() do
       -- Attach proposal information
       self._roidb[i] = db:attachProposals(i)  
+     
     end
 
     if config.use_flipped then
@@ -100,6 +103,8 @@ function ROI:create_roidb(db)
         end
       end
     end
+    self.means = means
+    self.stds = stds
     -- Return the computed mean and std for reverting the normalization in further computations
     return means,stds
 end
@@ -203,48 +208,20 @@ function ROI:_clip(boxes,im_size)
     return boxes
 end
 
+-- The following function is borrowed and changed from https://github.com/fmassa/object-detection.torch
 function ROI:projectImageROIs(im_rois,scales,train_mode)
-
-  -- we consider two cases:
-  -- During training, the scales are sampled randomly per image, so
-  -- in the same image all the bboxes have the same scale, and we only
-  -- need to take into account the different images that are provided.
-  -- During testing, we consider that there is only one image at a time,
-  -- and the scale for each bbox is the one which makes its area closest
-  -- to self.inputArea
   local rois = torch.FloatTensor()
-  if train_mode or #scales == 1 then
-    local total_bboxes = 0
-    local cumul_bboxes = {0}
-    for i=1,#scales do
-      total_bboxes = total_bboxes + im_rois[i]:size(1)
-      table.insert(cumul_bboxes,total_bboxes)
-    end
-    rois:resize(total_bboxes,5)
-    for i=1,#scales do
-      local idx = {cumul_bboxes[i]+1,cumul_bboxes[i+1]}
-      rois[{idx,1}]:fill(i)
-      rois[{idx,{2,5}}]:copy(im_rois[i]):add(-1):mul(scales[i]):add(1)
-    end
-  else -- not yet tested
-    error('Multi-scale testing not yet tested')
-    local scales = torch.FloatTensor(scales)
-    im_rois = im_rois[1]
-    local widths = im_rois[{{},3}] - im_rois[{{},1}] + 1
-    local heights = im_rois[{{},4}] - im_rois[{{}, 2}] + 1
-
-    local areas = widths * heights
-    local scaled_areas = areas:view(-1,1) * scales:view(1,-1):pow(2)
-    local diff_areas = scaled_areas:add(-1,self.inputArea):abs() -- no memory copy
-    local levels = select(2, diff_areas:min(2))
-
-    local num_boxes = im_rois:size(1)
-    rois:resize(num_boxes,5)
-    for i=1,num_boxes do
-      local s = levels[i]
-      rois[{i,{2,5}}]:copy(im_rois[i]):add(-1):mul(scales[s]):add(1)
-      rois[{i,1}] = s
-    end
+  local total_bboxes = 0
+  local cumul_bboxes = {0}
+  for i=1,#scales do
+    total_bboxes = total_bboxes + im_rois[i]:size(1)
+    table.insert(cumul_bboxes,total_bboxes)
+  end
+  rois:resize(total_bboxes,5)
+  for i=1,#scales do
+    local idx = {cumul_bboxes[i]+1,cumul_bboxes[i+1]}
+    rois[{idx,1}]:fill(i)
+    rois[{idx,{2,5}}]:copy(im_rois[i]):add(-1):mul(scales[i]):add(1)
   end
   return rois
 end
