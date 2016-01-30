@@ -1,39 +1,37 @@
---------------------------------------------------------------------------------
--- utility functions for the evaluation part
---------------------------------------------------------------------------------
-
 local GeneralUtils = torch.class('detection.GeneralUtils')
 
 
 function GeneralUtils:__init()
   return self
 end
--- can be replaced by the new torch.cat function
-function GeneralUtils:joinTable(input,dim)
-  local size = torch.LongStorage()
-  local is_ok = false
-  for i=1,#input do
-    local currentOutput = input[i]
-    if currentOutput:numel() > 0 then
-      if not is_ok then
-        size:resize(currentOutput:dim()):copy(currentOutput:size())
-        is_ok = true
+
+function GeneralUtils:table2str(tab,internal_node)
+  local str = ''
+  for k,v in pairs(tab) do
+    local cur_k = k
+    local cur_v = v
+    if type(k) == 'table' then
+        cur_k = self:table2str(k,true)
+    end
+    if type(v) == 'table' then
+        cur_v = self:table2str(v,true)
+    end
+    if type(v) == 'boolean' then
+      if v== false then
+        cur_v = 'false'
       else
-        size[dim] = size[dim] + currentOutput:size(dim)
-      end    
+        cur_v = 'true'
+      end
+    end
+    if type(cur_v)~='function' then
+      if internal_node then
+        str = str .. cur_k .. ': ' .. cur_v .. ' ' 
+      else
+        str = str .. cur_k .. ': ' .. cur_v .. '\n'
+      end
     end
   end
-  local output = input[1].new():resize(size)
-  local offset = 1
-  for i=1,#input do
-    local currentOutput = input[i]
-    if currentOutput:numel() > 0 then
-      output:narrow(dim, offset,
-                    currentOutput:size(dim)):copy(currentOutput)
-      offset = offset + currentOutput:size(dim)
-    end
-  end
-  return output
+  return str
 end
 
 function GeneralUtils:shuffle(dim,tensor)
@@ -53,54 +51,110 @@ function GeneralUtils:logical2ind(logical)
   return torch.range(1,logical:numel())[logical:gt(0)]:long()
 end
 
-
-function GeneralUtils:recursiveResizeAsCopyTyped(t1,t2,type)
-  if torch.type(t2) == 'table' then
-    t1 = (torch.type(t1) == 'table') and t1 or {t1}
-    for key,_ in pairs(t2) do
-      t1[key], t2[key] = self:recursiveResizeAsCopyTyped(t1[key], t2[key], type)
+function GeneralUtils:makeWholeNetworkParallel(model)
+  local nGPU = math.min(cutorch.getDeviceCount(),config.nGPU)
+  local curmodel = nn.DataParallelTable(1)
+  for i=1, nGPU do
+      cutorch.setDevice(i)
+      curmodel:add(model:clone():cuda(), i)
     end
-  elseif torch.isTensor(t2) then
-    local type = type or t2:type()
-    t1 = torch.isTypeOf(t1,type) and t1 or torch.Tensor():type(type)
-    t1:resize(t2:size()):copy(t2)
-  else
-    error("expecting nested tensors or tables. Got "..
-    torch.type(t1).." and "..torch.type(t2).." instead")
-  end
-  return t1, t2
+    cutorch.setDevice(1)
+    return curmodel
 end
 
-function GeneralUtils:concat(t1,t2,dim)
-  local out
-  assert(t1:type() == t2:type(),'tensors should have the same type')
-  if t1:dim() > 0 and t2:dim() > 0 then
-    dim = dim or t1:dim()
-    out = torch.cat(t1,t2,dim)
-  elseif t1:dim() > 0 then
-    out = t1:clone()
-  else
-    out = t2:clone()
-  end
-  return out
+
+function GeneralUtils:recursiveMakeDataParallel(model)
+    if model:size() == 1 then
+      return model
+    end
+    for i=1,model:size() do
+        local model_i = model:get(i)
+        --if torch.type(model_i) == 'nn.ConcatTable' then
+        --  return model
+        if torch.type(model_i) == 'nn.Sequential' or torch.type(model_i) == 'nn.ConcatTable' then
+          -- Make it parallel
+          print('Coverting sub-module to DataParallelTable')
+          local nGPU = math.min(cutorch.getDeviceCount(),config.nGPU)
+          local model_single = model_i
+          local curmodel = nn.DataParallelTable(1)
+          for i=1, nGPU do
+            cutorch.setDevice(i)
+            if i==1 then 
+              curmodel:add(model_single:clone():cuda(), i)
+            else 
+              curmodel:add(model_single:clone():cuda(), i)
+            end
+          end
+          cutorch.setDevice(1)
+          -- replace the layer
+          model.modules[i] = curmodel
+        else
+          if model_i.size then -- It is a container
+            self:recursiveMakeDataParallel(model_i)
+          end
+        end
+    end
+    return model
 end
 
--- modify bbox input
-function GeneralUtils:flipBoundingBoxes(bbox, im_width)
-  if bbox:dim() == 1 then 
-    local tt = bbox[1]
-    bbox[1] = im_width-bbox[3]+1
-    bbox[3] = im_width-tt     +1
-  else
-    local tt = bbox[{{},1}]:clone()
-    bbox[{{},1}]:fill(im_width+1):add(-1,bbox[{{},3}])
-    bbox[{{},3}]:fill(im_width+1):add(-1,tt)
-  end
+function GeneralUtils:_recursiveUndoDataParallel(model)
+
 end
 
---------------------------------------------------------------------------------
+function GeneralUtils:saveDataParallel(filename, model)
+  -- Borrowed from https://github.com/soumith/imagenet-multiGPU.torch/
+   if torch.type(model) == 'nn.DataParallelTable' then
+      torch.save(filename, self:cleanDPT(model))
+   elseif torch.type(model) == 'nn.Sequential' then
+      local temp_model = nn.Sequential()
+      for i, module in ipairs(model.modules) do
+         if torch.type(module) == 'nn.DataParallelTable' then
+            temp_model:add(self:cleanDPT(module))
+         else
+            temp_model:add(module)
+         end
+      end
+      torch.save(filename, temp_model)
+   else
+      error('This saving function only works with Sequential or DataParallelTable modules.')
+   end
+end
+
+function GeneralUtils:loadDataParallel(filename, nGPU)
+  -- Borrowed from https://github.com/soumith/imagenet-multiGPU.torch/
+   local model = torch.load(filename)
+   if torch.type(model) == 'nn.DataParallelTable' then
+      return self:makeDataParallel(model:get(1):float(), nGPU)
+   elseif torch.type(model) == 'nn.Sequential' then
+      for i,module in ipairs(model.modules) do
+         if torch.type(module) == 'nn.DataParallelTable' then
+            model.modules[i] = self:makeDataParallel(module:get(1):float(), nGPU)
+         end
+      end
+      return model
+   else
+      error('The loaded model is not a Sequential or DataParallelTable module.')
+   end
+end
+
+function GeneralUtils:makeDataParallel(model, nGPU)
+-- borrowed from https://github.com/soumith/imagenet-multiGPU.torch/
+   if config.nGPU > 1 then
+      print('converting module to nn.DataParallelTable')
+      assert(nGPU <= cutorch.getDeviceCount(), 'number of GPUs less than nGPU specified')
+      local model_single = model
+      model = nn.DataParallelTable(1)
+      for i=1, nGPU do
+         cutorch.setDevice(i)
+         model:add(model_single:clone():cuda(), i)
+      end
+      cutorch.setDevice(config.GPU_ID)
+   end
+   return model
+end
 
 function GeneralUtils:keep_top_k(boxes,top_k)
+  -- This function is borrowed from https://github.com/fmassa/object-detection.torch
   local X = joinTable(boxes,1)
   if X:numel() == 0 then
     return
@@ -123,9 +177,90 @@ function GeneralUtils:keep_top_k(boxes,top_k)
   return boxes, thresh
 end
 
+function GeneralUtils:cleanDPT(module)
+  --  Borrowed from https://github.com/soumith/imagenet-multiGPU.torch/
+   local newDPT = nn.DataParallelTable(1)
+   cutorch.setDevice(config.GPU_ID)
+   newDPT:add(module:get(1), config.GPU_ID)
+   return newDPT
+end
+
+
+function GeneralUtils:recursiveResizeAsCopyTyped(t1,t2,type)
+  -- This function is borrowed from https://github.com/fmassa/object-detection.torch
+  if torch.type(t2) == 'table' then
+    t1 = (torch.type(t1) == 'table') and t1 or {t1}
+    for key,_ in pairs(t2) do
+      t1[key], t2[key] = self:recursiveResizeAsCopyTyped(t1[key], t2[key], type)
+    end
+  elseif torch.isTensor(t2) then
+    local type = type or t2:type()
+    t1 = torch.isTypeOf(t1,type) and t1 or torch.Tensor():type(type)
+    t1:resize(t2:size()):copy(t2)
+  else
+    error("expecting nested tensors or tables. Got "..
+    torch.type(t1).." and "..torch.type(t2).." instead")
+  end
+  return t1, t2
+end
+
+
+function GeneralUtils:flipBoundingBoxes(bbox, im_width)
+  -- This function is borrowed from https://github.com/fmassa/object-detection.torch
+  if bbox:dim() == 1 then 
+    local tt = bbox[1]
+    bbox[1] = im_width-bbox[3]+1
+    bbox[3] = im_width-tt     +1
+  else
+    local tt = bbox[{{},1}]:clone()
+    bbox[{{},1}]:fill(im_width+1):add(-1,bbox[{{},3}])
+    bbox[{{},3}]:fill(im_width+1):add(-1,tt)
+  end
+end
+
+function GeneralUtils:concat(t1,t2,dim)
+    -- This function is borrowed from https://github.com/fmassa/object-detection.torch
+  local out
+  assert(t1:type() == t2:type(),'tensors should have the same type')
+  if t1:dim() > 0 and t2:dim() > 0 then
+    dim = dim or t1:dim()
+    out = torch.cat(t1,t2,dim)
+  elseif t1:dim() > 0 then
+    out = t1:clone()
+  else
+    out = t2:clone()
+  end
+  return out
+end
+
+-------------------------------------------------------------------------------
+-- The following evaluation functions are borrowed from borrowed from https://github.com/soumith/imagenet-multiGPU.torch/
+-- *****NOTE: The defult method for evaluating the model is by using the pascal original evaluation package
+--            These functions are only used if the user does not have Matlab installed
 --------------------------------------------------------------------------------
--- evaluation
---------------------------------------------------------------------------------
+
+
+function GeneralUtils:print_scores(dataset,res)
+  print('Results:')
+  -- print class names
+  io.write('|')
+  for i = 1, dataset.num_classes do
+    io.write(('%5s|'):format(dataset.classes[i]))
+  end
+  io.write('\n|')
+  -- print class scores
+  for i = 1, dataset.num_classes do
+    local l = #dataset.classes[i] < 5 and 5 or #dataset.classes[i]
+    local l = res[i] == res[i] and l-5 or l-3
+    if l > 0 then
+      io.write(('%.3f%'..l..'s|'):format(res[i],' '))
+    else
+      io.write(('%.3f|'):format(res[i]))
+    end
+  end
+  io.write('\n')
+  io.write(('mAP: %.4f\n'):format(res:mean(1)[1]))
+end
 
 function GeneralUtils:VOCap(rec,prec)
 
@@ -145,8 +280,6 @@ function GeneralUtils:VOCap(rec,prec)
   end
   return ap
 end
-
---------------------------------------------------------------------------------
 
 function GeneralUtils:boxoverlap(a,b)
   local b = b.xmin and {b.xmin,b.ymin,b.xmax,b.ymax} or b
@@ -175,10 +308,6 @@ function GeneralUtils:boxoverlap(a,b)
   
   return o
 end
-
---------------------------------------------------------------------------------
-
-
 
 function GeneralUtils:VOCevaldet(dataset,scored_boxes,cls)
   local num_pr = 0
@@ -265,70 +394,7 @@ function GeneralUtils:VOCevaldet(dataset,scored_boxes,cls)
   return ap, recall, precision
 end
 
-
---------------------------------------------------------------------------------
--- data preparation
---------------------------------------------------------------------------------
-
--- Caffe models are in BGR format, and they suppose the images range from 0-255.
--- This function modifies the model read by loadcaffe to use it in torch format
--- location is the postion of the first conv layer in the module. If you have
--- nested models (like sequential inside sequential), location should be a
--- table with as many elements as the depth of the network.
-function GeneralUtils:convertCaffeModelToTorch(model,location)
-  local location = location or {1}
-  local m = model
-  for i=1,#location do
-    m = m:get(location[i])
-  end
-  local weight = m.weight
-  local weight_clone = weight:clone()
-  local nchannels = weight:size(2)
-  for i=1,nchannels do
-    weight:select(2,i):copy(weight_clone:select(2,nchannels+1-i))
-  end
-  weight:mul(255)
-end
-
-
---------------------------------------------------------------------------------
--- nn
---------------------------------------------------------------------------------
-
-function GeneralUtils:reshapeLastLinearLayer(model,nOutput)
-  local layers = model:findModules('nn.Linear')
-  local layer = layers[#layers]
-  local nInput = layer.weight:size(2)
-  layer.gradBias:resize(nOutput):zero()
-  layer.gradWeight:resize(nOutput,nInput):zero()
-  layer.bias:resize(nOutput)
-  layer.weight:resize(nOutput,nInput)
-  layer:reset()
-end
-
--- borrowed from https://github.com/soumith/imagenet-multiGPU.torch/blob/master/train.lua
--- clear the intermediate states in the model before saving to disk
--- this saves lots of disk space
-function GeneralUtils:sanitize(net)
-  local list = net:listModules()
-  for _,val in ipairs(list) do
-    for name,field in pairs(val) do
-      if torch.type(field) == 'cdata' then val[name] = nil end
-      if name == 'homeGradBuffers' then val[name] = nil end
-      if name == 'input_gpu' then val['input_gpu'] = {} end
-      if name == 'gradOutput_gpu' then val['gradOutput_gpu'] = {} end
-      if name == 'gradInput_gpu' then val['gradInput_gpu'] = {} end
-      if (name == 'output' or name == 'gradInput') then
-        val[name] = field.new()
-      end
-    end
-  end
-end
-
-
-
 function GeneralUtils:nms(boxes, overlap)
-  
     local pick = torch.LongTensor()
 
     if boxes:numel() == 0 then
@@ -454,28 +520,4 @@ function GeneralUtils:visualize_detections(im,boxes,scores,thresh,cl_names)
   w:setlinewidth(2)
   w:stroke()
   return w
-end
-
-
-
-function GeneralUtils:print_scores(dataset,res)
-  print('Results:')
-  -- print class names
-  io.write('|')
-  for i = 1, dataset.num_classes do
-    io.write(('%5s|'):format(dataset.classes[i]))
-  end
-  io.write('\n|')
-  -- print class scores
-  for i = 1, dataset.num_classes do
-    local l = #dataset.classes[i] < 5 and 5 or #dataset.classes[i]
-    local l = res[i] == res[i] and l-5 or l-3
-    if l > 0 then
-      io.write(('%.3f%'..l..'s|'):format(res[i],' '))
-    else
-      io.write(('%.3f|'):format(res[i]))
-    end
-  end
-  io.write('\n')
-  io.write(('mAP: %.4f\n'):format(res:mean(1)[1]))
 end
