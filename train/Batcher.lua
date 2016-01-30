@@ -114,9 +114,6 @@ function Batcher:_process_batch(ids)
 		imgs_batch[{{i},{},{1,imgs[i]:size(2)},{1,imgs[i]:size(3)}}] = imgs[i]
 	end
 
-
-
-
 	return {imgs_batch,roi_batch}, {labels,bbox_targets}, loss_weights
 
 end
@@ -154,7 +151,6 @@ function Batcher:_select_rois(roidb_entry)
 		selected_fg_inds = fg_inds[{{1,cur_num_fg}}]
 	end
 
-
 	-- Sampling bgs without replacement
 	local selected_bg_inds = torch.ByteTensor()
 	if cur_num_bg > 0 then
@@ -174,14 +170,12 @@ end
 
 
 function Batcher:_visualize_batch(im,boxes)
-	 local ok = pcall(require,'qt')
+  local ok = pcall(require,'qt')
   if not ok then
     error('You need to run visualize_detections using qlua')
   end
   require 'qttorch'
   require 'qtwidget'
-
-  
 
   local num_boxes = boxes:size(1)
   local widths  = boxes[{{},3}] - boxes[{{},1}]
@@ -198,13 +192,9 @@ function Batcher:_visualize_batch(im,boxes)
     local width,height = widths[i], heights[i]
     
     -- add bbox
-
     w:setcolor("red")
-
     w:rectangle(x,y,width,height)
-
     w:moveto(x,y+fontsize)
-
     w:setfont(qt.QFont{serif=true,italic=true,size=fontsize,bold=true})
 
   end
