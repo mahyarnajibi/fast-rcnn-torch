@@ -1,3 +1,5 @@
+-- This file is borrowed from https://github.com/fmassa/object-detection.torch
+
 local utilities = detection.GeneralUtils()
 
 local DataSetDetection = torch.class('detection.DataSetDetection')

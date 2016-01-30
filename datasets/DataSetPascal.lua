@@ -1,6 +1,8 @@
+-- This file is borrowed from https://github.com/fmassa/object-detection.torch
+
 local matio = require 'matio'
 local io = require 'io'
-local argcheck = dofile'argcheck.lua'--require 'argcheck'
+local argcheck = dofile'datasets/argcheck.lua'--require 'argcheck'
 local xml = require 'xml'
 local utilities = detection.GeneralUtils()
 local concat = utilities.concat
@@ -310,7 +312,7 @@ function DataSetPascal:getGTBoxes(i)
   local gt_boxes = torch.IntTensor()
   local gt_classes = {}
 
-  if self.with_hard_samples then -- inversed with respect to RCNN code
+  if config.use_difficult_objs then -- inversed with respect to RCNN code
     for idx,obj in ipairs(anno.object) do
       if self.class_to_id[obj.name] then -- to allow a subset of the classes
         table.insert(valid_objects,idx)
@@ -319,7 +321,7 @@ function DataSetPascal:getGTBoxes(i)
   else
     for idx,obj in ipairs(anno.object) do
 
-      if self.class_to_id[obj.name] and (config.use_difficult_objs or obj.difficult == 0) then -- even load the difficult ones we need it for training!
+      if obj.difficult == '0' and self.class_to_id[obj.name] then -- even load the difficult ones we need it for training!
         table.insert(valid_objects,idx)
       end
     end
