@@ -1,4 +1,5 @@
 local ROIPooling,parent = torch.class('detection.ROIPooling','nn.Module')
+-- This file is borrowed from https://github.com/fmassa/object-detection.torch
 
 function ROIPooling:__init(W,H)
   parent.__init(self)
@@ -15,8 +16,13 @@ function ROIPooling:setSpatialScale(scale)
 end
 
 function ROIPooling:updateOutput(input)
+
   local data = input[1]
-  local rois = input[2]
+  local rois = input[2]:clone()
+  --currect image ids if we are in parallel mode
+  if rois[1][1] ~=1 then
+    rois[{{},{1}}] = rois[{{},{1}}] - rois[1][1]+1
+  end
 
   local num_rois = rois:size(1)
   local s = data:size()
@@ -56,7 +62,10 @@ end
 
 function ROIPooling:updateGradInput(input,gradOutput)
   local data = input[1]
-  local rois = input[2]
+  local rois = input[2]:clone()
+  if rois[1][1] ~=1 then
+    rois[{{},{1}}] = rois[{{},{1}}] - rois[1][1]+1
+  end
   if rois:type() == 'torch.CudaTensor' then
     rois = self._rois
   end
