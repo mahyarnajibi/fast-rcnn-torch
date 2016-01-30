@@ -5,7 +5,7 @@ function ROIPooling:__init(W,H)
   parent.__init(self)
   self.W = W
   self.H = H
-  self.pooler = {}--nn.SpatialAdaptiveMaxPooling(W,H)
+  self.pooler = {}
   self.spatial_scale = 1
   self.gradInput = {torch.Tensor()}
 end
