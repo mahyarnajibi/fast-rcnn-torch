@@ -7,8 +7,8 @@ local utils = detection.GeneralUtils()
 -- Paths
 local image_path = './data/demo/test.jpg'
 local selective_search_path = './data/demo/proposals.mat'
-local param_path = 'data/models/torch_fast_rcnn_models/CaffeNet/FRCNN_CaffeNet.t7'
-local model_path = 'models/CaffeNet/FRCNN.lua'
+local param_path = config.model_weights
+local model_path = config.model_def
 
 -- Creating the network
 network = detection.Net(model_path,param_path)

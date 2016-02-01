@@ -4,7 +4,6 @@ require 'inn'
 require 'nn'
 require 'torch'
 matio = require 'matio'
-
 config = dofile 'config.lua'
 config = config.parse(arg)
 cutorch.setDevice(config.GPU_ID)
