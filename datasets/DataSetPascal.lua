@@ -1,4 +1,5 @@
 -- This file is borrowed from https://github.com/fmassa/object-detection.torch
+-- but functions for using the official Pascal VOCdevkit are added
 
 local matio = require 'matio'
 local io = require 'io'
@@ -217,7 +218,7 @@ function DataSetPascal:evaluate(all_detections)
   string.format('voc_eval(\'%s\',\'%s\',\'%s\',\'%s\',%d); quit;"', '../../' .. config.dataset_path .. '/' .. config.dataset,
     comp_id,self.image_set, '../../cache',0)
   print(cmd)
-  os.execute(cmd)
+  return os.execute(cmd)
 end
 
 function DataSetPascal:size()

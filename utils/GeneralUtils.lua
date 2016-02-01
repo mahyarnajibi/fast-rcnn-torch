@@ -234,7 +234,7 @@ function GeneralUtils:concat(t1,t2,dim)
 end
 
 -------------------------------------------------------------------------------
--- The following evaluation functions are borrowed from borrowed from https://github.com/soumith/imagenet-multiGPU.torch/
+-- The following evaluation functions are borrowed from https://github.com/fmassa/object-detection.torch
 -- *****NOTE: The defult method for evaluating the model is by using the pascal original evaluation package
 --            These functions are only used if the user does not have Matlab installed
 --------------------------------------------------------------------------------
