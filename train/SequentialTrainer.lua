@@ -3,14 +3,12 @@ require 'paths'
 SequentialTrainer = torch.class('detection.SequentialTrainer')
 local utils = detection.GeneralUtils()
 local _iter_show = 20
-function SequentialTrainer:__init(net,cls_criterion,reg_criterion,roi)
+function SequentialTrainer:__init(cls_criterion,reg_criterion,roi)
 	-- Initializing...
 	self._avg_cls_loss = 0
 	self._avg_reg_loss = 0
-	self._net = net
-	self._net:training()
-	self._net:initialize_for_training()
-	self._model = self._net:get_model()
+	network:training()
+	network:initialize_for_training()
 	self._cls_criterion = cls_criterion
 	self._reg_criterion = reg_criterion
 	self._timer = torch.Timer()
@@ -18,24 +16,20 @@ function SequentialTrainer:__init(net,cls_criterion,reg_criterion,roi)
 	self._roi_means = torch.zeros(4,1):cat(roi.means:view(-1,1),1):cuda()
 	self._roi_stds = torch.zeros(4,1):cat(roi.stds:view(-1,1),1):cuda()
 	self._db_name = roi.db_name
-	self._parameters, self._gradParameters = self._net:getParameters()
+	self._parameters, self._gradParameters = network:getParameters()
 	self._inputs = torch.CudaTensor()
 	self._labels = torch.CudaTensor()
 	self._loss_weights = torch.CudaTensor()
-	local _log_name = self._net.name .. '_' .. self._db_name .. os.date('_%m.%d_%H.%M')
+	local _log_name = network.name .. '_' .. self._db_name .. os.date('_%m.%d_%H.%M')
 	self._log_path = paths.concat(config.log_path,_log_name)
 	self._logger = optim.Logger(self._log_path)
 end
 
-function SequentialTrainer:get_net()
-	return self._net
-end
 
 function SequentialTrainer:train()
 	local num_regimes = #config.optim_regimes
 	local start_iter = 1
 	local end_iter = 0
-	self._model:zeroGradParameters()
 	for r = 1,num_regimes do
 		self._optimState = {
 	         learningRate = config.optim_regimes[r][2],
@@ -65,21 +59,20 @@ function SequentialTrainer:_trainBatch(inputs_cpu,labels_cpu,loss_weights_cpu,it
 	-- Perform sgd
 	local cls_err,reg_err,outputs
 	feval = function(x)
-		self._model:zeroGradParameters()
+		network.model:zeroGradParameters()
 		 -- Zero label is the background class!
-		local outputs = self._model:forward(self._inputs)
+		local outputs = network.model:forward(self._inputs)
 		cls_err = self._cls_criterion:forward(outputs[1],self._labels[1]:view(-1)+1)
 		reg_err = self._reg_criterion:forward(outputs[2],{self._labels[2],self._loss_weights})
 		local cls_grad_out = self._cls_criterion:backward(outputs[1],self._labels[1]:view(-1)+1) 
 		local reg_grad_out = self._reg_criterion:backward(outputs[2],{self._labels[2],self._loss_weights})
-		self._model:backward(self._inputs,{cls_grad_out,reg_grad_out})
+		network.model:backward(self._inputs,{cls_grad_out,reg_grad_out})
 		return cls_err+reg_err, self._gradParameters
 	end
 
     self._timer:reset()
 	optim.sgd(feval, self._parameters, self._optimState)
-
-	self._avg_cls_loss =self._avg_cls_loss+ cls_err
+	self._avg_cls_loss = self._avg_cls_loss + cls_err
 	self._avg_reg_loss = self._avg_reg_loss + reg_err
 
 	local training_time = self._timer:time().real
@@ -95,10 +88,10 @@ function SequentialTrainer:_trainBatch(inputs_cpu,labels_cpu,loss_weights_cpu,it
 	if iter % config.optim_snapshot_iters ==0 then
 		-- Saving the network
 		print('Saving the network for iter '.. iter)
-		local file_name = self._net.name .. '_' .. self._db_name .. '_iter' .. '_' .. iter .. os.date('_%m.%d_%H.%M')
+		local file_name = network.name .. '_' .. self._db_name .. '_iter' .. '_' .. iter .. os.date('_%m.%d_%H.%M')
 		local save_path = paths.concat(config.save_path ,file_name)
 		local net_path = save_path .. '.t7'
-		self._net:save(net_path,self._roi_means,self._roi_stds)
+		network:save(net_path,self._roi_means,self._roi_stds)
 		-- Saving parameters
 		local txt_path = save_path .. '.txt'
 		local file = io.open(txt_path,'w')

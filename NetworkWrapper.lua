@@ -3,9 +3,8 @@ NetworkWrapper = torch.class('detection.NetworkWrapper')
 local utils = detection.GeneralUtils()
 local ROI = detection.ROI()
 local InputMaker = detection.InputMaker()
-function NetworkWrapper:__init(net)
+function NetworkWrapper:__init()
   self.train = true
-  self.net = net
   self._softmax= cudnn.SoftMax():cuda()
 end
 
@@ -15,7 +14,7 @@ end
 
 function NetworkWrapper:evaluate()
   self.train = false
-  self.net:get_model():evaluate()
+  network:get_model():evaluate()
   config.use_difficult_objs = false
 end
 
@@ -32,11 +31,11 @@ function NetworkWrapper:trainNetwork(db)
   local roi = detection.ROI()
   local bbox_means,bbox_stds = roi:create_roidb(db)
   if config.nGPU>1 then
-    local parallelTrainer = detection.ParallelTrainer(self.net,nn.CrossEntropyCriterion():cuda(),detection.WeightedSmoothL1Criterion():cuda(),roi)
+    local parallelTrainer = detection.ParallelTrainer(nn.CrossEntropyCriterion():cuda(),detection.WeightedSmoothL1Criterion():cuda(),roi)
   
     parallelTrainer:train()
   else
-    local sequentialTrainer = detection.SequentialTrainer(self.net,nn.CrossEntropyCriterion():cuda(),detection.WeightedSmoothL1Criterion():cuda(),roi)
+    local sequentialTrainer = detection.SequentialTrainer(nn.CrossEntropyCriterion():cuda(),detection.WeightedSmoothL1Criterion():cuda(),roi)
     sequentialTrainer:train()
   end
 end
@@ -46,7 +45,7 @@ function NetworkWrapper:detect(im,boxes)
   local proc_im,proc_boxes,im_scale = InputMaker:process(im,boxes)
   -- Making image 4D and create the input structure
   local inputs = {proc_im:view(1,proc_im:size(1),proc_im:size(2),proc_im:size(3)),proc_boxes}
-  local scores,bbox_deltas = self.net:forward(inputs)
+  local scores,bbox_deltas = network:forward(inputs)
   -- Applying Softmax
   scores = self._softmax:forward(scores)
   local predicted_boxes = ROI:bbox_decode(boxes,bbox_deltas,{im:size()[2],im:size()[3]})

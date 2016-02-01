@@ -18,9 +18,9 @@ end
 
 function Net:initialize_for_training()
 	-- initialize classifier and regressor with appropriate random numbers 
-	self.classifier.weight = torch.randn(self.classifier.weight:size()):cuda()* 0.01
+	self.classifier.weight:normal(0,0.01)
 	self.classifier.bias:fill(0)
-	self.regressor.weight = torch.randn(self.regressor.weight:size()):cuda() * 0.001
+	self.regressor.weight:normal(0,0.001)
 	self.regressor.bias:fill(0)
 end
 

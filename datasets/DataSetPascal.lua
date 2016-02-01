@@ -111,7 +111,6 @@ local initcheck = argcheck{
 function DataSetPascal:__init(...)
   parent.__init(self)
   local args = initcheck(...)
-  print(args)
   for k,v in pairs(args) do self[k] = v end
   
   local image_set = self.image_set

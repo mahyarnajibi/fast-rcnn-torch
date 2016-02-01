@@ -18,7 +18,6 @@ fprintf('~~~~~~~~~~~~~~~~~~~~\n');
 function res = voc_eval_cls(cls, VOCopts, comp_id, output_dir, rm_res)
 
 test_set = VOCopts.testset;
-disp(VOCopts)
 year = VOCopts.dataset(4:end);
 
 addpath(fullfile(VOCopts.datadir, 'VOCcode'));
