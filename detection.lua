@@ -31,8 +31,8 @@ torch.include('detection','ROI/ROIPooling.lua')
 
 -- Detection Network training and Testing 
 -- torch.include('detection','DB_tester.lua')
-torch.include('detection','NetworkWrapper.lua')
-torch.include('detection','Net.lua')
+torch.include('detection','network/NetworkWrapper.lua')
+torch.include('detection','network/Net.lua')
 torch.include('detection','train/Batcher.lua')
 torch.include('detection','train/ParallelTrainer.lua')
 torch.include('detection','train/SequentialTrainer.lua')
