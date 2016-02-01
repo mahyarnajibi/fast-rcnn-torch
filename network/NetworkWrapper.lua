@@ -144,12 +144,12 @@ function NetworkWrapper:testNetwork(db)
     end
     local misc_time = misc_timer:time().real
     avg_misc_time = avg_misc_time +misc_time
-    print('Image# = '.. i .. ', detection time = ' .. det_time .. ', misc time = ' .. misc_time)
+    print(string.format('Image# = %d/%d, detection time = %2.3fs, misc time = %2.3fs',i,n_image,det_time,misc_time))
 
   end
   avg_misc_time = avg_misc_time / n_image
   avg_det_time = avg_det_time / n_image
-  print(n_image .. ' images detected! ' .. ',average detection time = ' .. avg_det_time .. ', average misc time = ' .. avg_misc_time)
+  print(string.format('%d images detected!, average detection time = %2.3fs, average misc time = %2.3fs',n_image,avg_det_time,avg_misc_time))
   
   -- local det_save_path = config.cache .. '/' .. db.dataset_name .. '_' .. db.image_set .. '_detections.t7'
   -- local thresholds_save_path = config.cache .. '/' .. db.dataset_name .. '_' .. db.image_set .. '_thresholds.t7'
