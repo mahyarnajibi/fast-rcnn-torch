@@ -21,7 +21,7 @@ Now you can train the model by calling ```th main_train.lua```. However, you sho
 
 * At least you need to specify the path to the parent directory of the VOC devkit folder by setting ```-dataset_path 'path to the directory' ``` (the default is ```./data/datasets/```) and the name of the VOC devkit folder by setting ```-dataset 'name of the root folder' ``` (the default is ```voc_2007```). 
 * You can change the training set from *trainval* to *train* by passing ```-train_img_set 'train'```.
-* If you want to train a model other than AlexNet, please add a Lua definition of the model  in the ```./models``` folder and pass its location by setting the ```-model_def 'path to the model definition' ``` option. In that case, you probably need to specify the appropriate pre-trained model for fine-tuning by passing the  pre-trained path by setting the ```-pre_trained_file 'path to the pre-trained file' ```.
+* If you want to train a model other than AlexNet, you need to add a Lua definition of the model  in the ```./models``` folder and pass its location by setting the ```-model_def 'path to the model definition' ``` option. In that case, you probably need to specify the appropriate pre-trained model for fine-tuning by passing the  pre-trained path by setting the ```-pre_trained_file 'path to the pre-trained file' ```.
 * The models together with a text file describing the configuration of the training will be saved into the ```./data/trained_models/```. You can change this directory by passing the ```-save_path 'your new path to save the models'``` option. 
 * The loss values and the loss diagrams will be saved into ```./data/log/```. You can change it by passing ```-log_path 'new path for saving the log files'```.
 
