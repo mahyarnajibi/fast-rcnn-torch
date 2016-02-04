@@ -178,14 +178,4 @@ function NetworkWrapper:testNetwork(db)
 
   -- Try to evaluate using the official eval functions
   local return_val = db:evaluate(all_detections)
-  if return_val ~=0 then
-    local test_result = torch.FloatTensor(n_class)
-    for i=1,n_class do
-      local cur_class = db.classes[i]
-      test_result[i] = utils:VOCevaldet(db,all_detections[i],cur_class)
-    end
-
-    utils:print_scores(db,test_result)
-  end
- 
 end

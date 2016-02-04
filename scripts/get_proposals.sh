@@ -7,9 +7,9 @@ URL=http://www.cs.berkeley.edu/~rbg/fast-rcnn-data/$file_name
 
 
 if [ "$dir_name" = "scripts" ]; then
-  save_path=../data/datasets/selective_search
+  save_path=../data/datasets/
 else
-  save_path=./data/datasets/selective_search
+  save_path=./data/datasets/
 fi
 
 

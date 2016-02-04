@@ -4,11 +4,11 @@ require 'detection'
 -- Paths
 local dataset_name = config.dataset
 local image_set = config.train_img_set
-local dataset_dir = './data/datasets/'..dataset_name
-local ss_dir = './data/datasets/selective_search/'
-local ss_file =  ss_dir .. dataset_name .. '_' .. image_set .. '.mat'
-local param_path = 'data/models/torch_imagenet_models/CaffeNet.v2.t7'
-local model_path = 'models/CaffeNet/FRCNN.lua'
+local dataset_dir = paths.concat(config.dataset_path,dataset_name)
+local ss_dir = './data/datasets/selective_search_data/'
+local ss_file =  paths.concat(ss_dir, dataset_name .. '_' .. image_set .. '.mat')
+local param_path = config.pre_trained_file
+local model_path = config.model_def
 
 
 -- Loading the dataset

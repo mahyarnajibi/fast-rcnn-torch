@@ -20,7 +20,7 @@ function InputMaker:process(orig_im,bboxes)
        im_scale = config.max_size/im_size_max
     end
     local new_size = {torch.round(im_size[1]*im_scale),torch.round(im_size[2]*im_scale)}
-    local out_im = image.scale(im,new_size[2],new_size[1])
+    local out_im = image.scale(im,new_size[2],new_size[1],'bicubic')
 
     -- Project ROIs
     local out_bboxes = ROI:projectImageROIs({bboxes},{im_scale})

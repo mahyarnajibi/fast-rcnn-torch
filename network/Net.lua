@@ -1,5 +1,5 @@
 Net = torch.class('detection.Net')
-utils = detection.GeneralUtils()
+local utils = detection.GeneralUtils()
 function Net:__init(model_path,weight_file_path)
 	self.model_path = model_path
 	self.weight_file_path = weight_file_path

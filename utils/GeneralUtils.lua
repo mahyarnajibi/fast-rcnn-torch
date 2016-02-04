@@ -101,6 +101,100 @@ function GeneralUtils:_recursiveUndoDataParallel(model)
 
 end
 
+function GeneralUtils:visualize_detections(im,boxes,scores,thresh,cl_names)
+  local ok = pcall(require,'qt')
+  if not ok then
+    error('You need to run visualize_detections using qlua')
+  end
+  require 'qttorch'
+  require 'qtwidget'
+
+  -- select best scoring boxes without background
+  local max_score,idx = scores[{{},{2,-1}}]:max(2)
+
+  local idx_thresh = max_score:gt(thresh)
+  max_score = max_score[idx_thresh]
+  idx = idx[idx_thresh]
+
+  local r = torch.range(1,boxes:size(1)):long()
+  local rr = r[idx_thresh]
+  if rr:numel() == 0 then
+    error('No detections with a score greater than the specified threshold')
+  end
+  local boxes_thresh = boxes:index(1,rr)
+  
+  local keep = self:nms(torch.cat(boxes_thresh:float(),max_score:float(),2),0.3)
+  
+  boxes_thresh = boxes_thresh:index(1,keep)
+  max_score = max_score:index(1,keep)
+  idx = idx:index(1,keep)
+
+  local num_boxes = boxes_thresh:size(1)
+  local widths  = boxes_thresh[{{},3}] - boxes_thresh[{{},1}]
+  local heights = boxes_thresh[{{},4}] - boxes_thresh[{{},2}]
+
+  local x,y = im:size(3),im:size(2)
+  local w = qtwidget.newwindow(x,y,"Fast R-CNN for Torch!")
+  
+  local qtimg = qt.QImage.fromTensor(im)
+  w:image(0,0,x,y,qtimg)
+  local fontsize = 16
+
+  w:setcolor(200/255,130/255,200/255,1)
+  w:rectangle(20,20,120,55)
+  w:fill()
+  w:stroke()
+
+  w:setcolor(0,0,0,1)
+  w:fill(false)
+  w:rectangle(20,20,120,55)
+  w:stroke()
+  w:moveto(30,40)
+  w:setfont(qt.QFont{serif=true,italic=true,size=fontsize,bold=true})
+  w:setcolor(qt.QColor("#000000"))
+  w:show('Click on')
+  w:moveto(30,40+fontsize+5)
+  w:show('boxes!')
+  for i=1,num_boxes do
+    local x,y = boxes_thresh[{i,1}],boxes_thresh[{i,2}]
+    local width,height = widths[i], heights[i]
+    w:rectangle(x,y,width,height)
+
+  end
+  w:setcolor("#7CFF00")
+  w:setlinewidth(2)
+  w:stroke()
+
+  qt.connect(w.listener,
+    'sigMousePress(int,int,QByteArray,QByteArray,QByteArray)',
+    function(x,y)
+        for i = 1, boxes_thresh:size(1) do
+          if x>boxes_thresh[i][1] and x < boxes_thresh[i][3] and y>boxes_thresh[i][2] and y<boxes_thresh[i][4] then
+            w:setcolor(200/255,130/255,200/255,1)
+            w:rectangle(20,20,120,55)
+            w:fill()
+            w:stroke()
+
+            w:setcolor(0,0,0,1)
+            w:fill(false)
+            w:rectangle(20,20,120,55)
+            w:stroke()
+
+            w:moveto(30,40)
+            w:setfont(qt.QFont{serif=true,italic=true,size=fontsize,bold=true})
+            w:setcolor(qt.QColor("#000000"))
+            w:show(cl_names[idx[i]])
+            w:moveto(30,40+fontsize+5)
+            w:show(string.format('%2.2f',max_score[i]))
+            w:stroke()
+            w:fill(false)
+          end
+        end
+    end );
+
+  return w
+end
+
 function GeneralUtils:saveDataParallel(filename, model)
   -- Borrowed from https://github.com/soumith/imagenet-multiGPU.torch/
    if torch.type(model) == 'nn.DataParallelTable' then
@@ -233,55 +327,10 @@ function GeneralUtils:concat(t1,t2,dim)
   return out
 end
 
--------------------------------------------------------------------------------
--- The following evaluation functions are borrowed from https://github.com/fmassa/object-detection.torch
--- *****NOTE: The defult method for evaluating the model is by using the pascal original evaluation package
---            These functions are only used if the user does not have Matlab installed
---------------------------------------------------------------------------------
 
-
-function GeneralUtils:print_scores(dataset,res)
-  print('Results:')
-  -- print class names
-  io.write('|')
-  for i = 1, dataset.num_classes do
-    io.write(('%5s|'):format(dataset.classes[i]))
-  end
-  io.write('\n|')
-  -- print class scores
-  for i = 1, dataset.num_classes do
-    local l = #dataset.classes[i] < 5 and 5 or #dataset.classes[i]
-    local l = res[i] == res[i] and l-5 or l-3
-    if l > 0 then
-      io.write(('%.3f%'..l..'s|'):format(res[i],' '))
-    else
-      io.write(('%.3f|'):format(res[i]))
-    end
-  end
-  io.write('\n')
-  io.write(('mAP: %.4f\n'):format(res:mean(1)[1]))
-end
-
-function GeneralUtils:VOCap(rec,prec)
-
-  local mrec = rec:totable()
-  local mpre = prec:totable()
-  table.insert(mrec,1,0); table.insert(mrec,1)
-  table.insert(mpre,1,0); table.insert(mpre,0)
-  for i=#mpre-1,1,-1 do
-      mpre[i]=math.max(mpre[i],mpre[i+1])
-  end
-  
-  local ap = 0
-  for i=1,#mpre-1 do
-    if mrec[i] ~= mrec[i+1] then
-      ap = ap + (mrec[i+1]-mrec[i])*mpre[i+1]
-    end
-  end
-  return ap
-end
 
 function GeneralUtils:boxoverlap(a,b)
+  -- This function is borrowed from https://github.com/fmassa/object-detection.torch
   local b = b.xmin and {b.xmin,b.ymin,b.xmax,b.ymax} or b
     
   local x1 = a:select(2,1):clone()
@@ -309,92 +358,10 @@ function GeneralUtils:boxoverlap(a,b)
   return o
 end
 
-function GeneralUtils:VOCevaldet(dataset,scored_boxes,cls)
-  local num_pr = 0
-  local energy = {}
-  local correct = {}
-  
-  local count = 0
-  
-  for i=1, dataset:size() do   
-    local ann = dataset:getAnnotation(i)   
-    local bbox = {}
-    local det = {}
-    for idx,obj in ipairs(ann.object) do
-      if obj.name == cls and obj.difficult == '0' then
-        table.insert(bbox,{obj.bndbox.xmin,obj.bndbox.ymin,
-                           obj.bndbox.xmax,obj.bndbox.ymax})
-        table.insert(det,0)
-        count = count + 1
-      end
-    end
-    
-    bbox = torch.Tensor(bbox)
-    det = torch.Tensor(det)
 
-    local num = scored_boxes[i]:numel()>0 and scored_boxes[i]:size(1) or 0
-    for j=1,num do
-      local bbox_pred = scored_boxes[i][j]
-      num_pr = num_pr + 1
-      table.insert(energy,bbox_pred[5])
-      
-      if bbox:numel()>0 then
-        local o = self:boxoverlap(bbox,bbox_pred[{{1,4}}])
-        local maxo,index = o:max(1)
-        maxo = maxo[1]
-        index = index[1]
-        if maxo >=0.5 and det[index] == 0 then
-          correct[num_pr] = 1
-          det[index] = 1
-        else
-          correct[num_pr] = 0
-        end
-      else
-          correct[num_pr] = 0        
-      end
-    end
-    
-  end
-  
-  if #energy == 0 then
-    return 0,torch.Tensor(),torch.Tensor()
-  end
-  
-  energy = torch.Tensor(energy)
-  correct = torch.Tensor(correct)
-  
-  local threshold,index = energy:sort(true)
-
-  correct = correct:index(1,index)
-
-  local n = threshold:numel()
-  
-  local recall = torch.zeros(n)
-  local precision = torch.zeros(n)
-
-  local num_correct = 0
-
-  for i = 1,n do
-      --compute precision
-      num_positive = i
-      num_correct = num_correct + correct[i]
-      if num_positive ~= 0 then
-          precision[i] = num_correct / num_positive;
-      else
-          precision[i] = 0;
-      end
-      
-      --compute recall
-      recall[i] = num_correct / count
-  end
-
-  ap = self:VOCap(recall, precision)
-  io.write(('AP = %.4f\n'):format(ap));
-
-  return ap, recall, precision
-end
 
 function GeneralUtils:nms(boxes, overlap)
+  -- This function is borrowed from https://github.com/fmassa/object-detection.torch
     local pick = torch.LongTensor()
 
     if boxes:numel() == 0 then
@@ -461,63 +428,3 @@ function GeneralUtils:nms(boxes, overlap)
 end
 
 
-function GeneralUtils:visualize_detections(im,boxes,scores,thresh,cl_names)
-  local ok = pcall(require,'qt')
-  if not ok then
-    error('You need to run visualize_detections using qlua')
-  end
-  require 'qttorch'
-  require 'qtwidget'
-
-  -- select best scoring boxes without background
-  local max_score,idx = scores[{{},{2,-1}}]:max(2)
-
-  local idx_thresh = max_score:gt(thresh)
-  max_score = max_score[idx_thresh]
-  idx = idx[idx_thresh]
-
-  local r = torch.range(1,boxes:size(1)):long()
-  local rr = r[idx_thresh]
-  if rr:numel() == 0 then
-    error('No detections with a score greater than the specified threshold')
-  end
-  local boxes_thresh = boxes:index(1,rr)
-  
-  local keep = self:nms(torch.cat(boxes_thresh:float(),max_score:float(),2),0.3)
-  
-  boxes_thresh = boxes_thresh:index(1,keep)
-  max_score = max_score:index(1,keep)
-  idx = idx:index(1,keep)
-
-  local num_boxes = boxes_thresh:size(1)
-  local widths  = boxes_thresh[{{},3}] - boxes_thresh[{{},1}]
-  local heights = boxes_thresh[{{},4}] - boxes_thresh[{{},2}]
-
-  local x,y = im:size(3),im:size(2)
-  local w = qtwidget.newwindow(x,y,"Detections")
-  local qtimg = qt.QImage.fromTensor(im)
-  w:image(0,0,x,y,qtimg)
-  local fontsize = 15
-
-  for i=1,num_boxes do
-    local x,y = boxes_thresh[{i,1}],boxes_thresh[{i,2}]
-    local width,height = widths[i], heights[i]
-    
-    -- add bbox
-    w:rectangle(x,y,width,height)
-    
-    -- add score
-    w:moveto(x,y+fontsize)
-    w:setcolor("red")
-    w:setfont(qt.QFont{serif=true,italic=true,size=fontsize,bold=true})
-    if cl_names then
-      w:show(string.format('%s: %.2f',cl_names[idx[i]],max_score[i]))
-    else
-      w:show(string.format('%d: %.2f',idx[i],max_score[i]))
-    end
-  end
-  w:setcolor("red")
-  w:setlinewidth(2)
-  w:stroke()
-  return w
-end

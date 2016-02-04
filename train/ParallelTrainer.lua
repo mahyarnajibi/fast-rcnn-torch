@@ -115,9 +115,11 @@ function ParallelTrainer._trainBatch(inputs_cpu,labels_cpu,loss_weights_cpu,regi
          learningRateDecay = 0.0,
          momentum = config.optim_momentum,
          dampening = 0.0,
-         weightDecay = config.optim_regimes[regime_id][3]
+         weightDecay = config.optim_regimes[regime_id][3],
+         nesterov = true
       }
     _timer:reset()
+    debugger.enter()
 	optim.sgd(feval, _parameters, optimState)
 
    -- DataParallelTable's syncParameters
