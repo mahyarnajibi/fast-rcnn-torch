@@ -9,7 +9,7 @@ function Net:__init(model_path,weight_file_path,model_opt)
 	end
 	self.model,self.classifier,self.regressor,self.name = dofile(model_path)(model_opt)
 
-	if config.nGPU > 1 then
+	if config.nGPU > 1 and not model_opt.test then
 		self:_makeParallel()
 	end
 	-- FOR DEBUG

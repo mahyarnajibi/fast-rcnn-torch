@@ -1,5 +1,6 @@
 -- Require the detection package
 require 'detection'
+
 -- Paths
 local dataset_name = config.dataset
 local image_set = config.test_img_set
@@ -9,11 +10,15 @@ local ss_file =  paths.concat(ss_dir,dataset_name .. '_' .. image_set .. '.mat')
 local param_path = config.model_weights
 local model_path = config.model_def
 
+
 -- Loading the dataset
 local dataset = detection.DataSetPascal({image_set = image_set, datadir = dataset_dir, roidbdir = ss_dir , roidbfile = ss_file})
 
 -- Creating the detection net
-network = detection.Net(model_path,param_path)
+local model_opt = {}
+model_opt.fine_tuning = false
+model_opt.test = true
+network = detection.Net(model_path,param_path, model_opt)
 
 -- Creating the wrapper
 local network_wrapper = detection.NetworkWrapper()
