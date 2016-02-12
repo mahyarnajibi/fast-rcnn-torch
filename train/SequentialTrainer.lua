@@ -32,7 +32,6 @@ end
 
 function SequentialTrainer:_getLR(iter,base_lr,gamma)
 	return base_lr * gamma ^ (iter)
-
 end
 
 function SequentialTrainer:train()
@@ -133,7 +132,7 @@ function SequentialTrainer:_trainBatch(inputs_cpu,labels_cpu,loss_weights_cpu,it
 		network:save(net_path,self._roi_means,self._roi_stds)
 
 		-- Save the optim state
-		optim_path = paths.concat(config.save_path,network.name .. '_' ..  _db_name .. '.t7') 
+		optim_path = paths.concat(config.save_path,network.name .. '_' ..  self._db_name .. '.t7') 
 		torch.save(optim_path,_optimState)
 
 		-- Saving parameters

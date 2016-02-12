@@ -1,7 +1,6 @@
 -- Require the detection package
 require 'detection'
 
-debugger = debugger.enter()
 -- Paths
 local dataset_name = config.dataset
 local image_set = config.train_img_set
