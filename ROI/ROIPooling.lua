@@ -19,7 +19,7 @@ function ROIPooling:updateOutput(input)
 
   local data = input[1]
   local rois = input[2]:clone()
-  --currect image ids if we are in parallel mode
+  --correct image ids if we are in parallel mode
   if rois[1][1] ~=1 then
     rois[{{},{1}}] = rois[{{},{1}}] - rois[1][1]+1
   end

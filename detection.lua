@@ -3,7 +3,9 @@ require 'cudnn'
 require 'inn'
 require 'nn'
 require 'torch'
+require 'xlua'
 matio = require 'matio'
+tds = require 'tds'
 config = dofile 'config.lua'
 config = config.parse(arg)
 cutorch.setDevice(config.GPU_ID)
@@ -23,7 +25,7 @@ torch.include('detection','utils/GeneralUtils.lua')
 -- -- Detection datasets
 torch.include('detection','datasets/DataSetDetection.lua')
 torch.include('detection','datasets/DataSetPascal.lua')
-
+torch.include('detection','datasets/DataSetCoco.lua')
 -- Detection roidb modules
 torch.include('detection','ROI/ROI.lua')
 torch.include('detection','ROI/ROIPooling.lua')

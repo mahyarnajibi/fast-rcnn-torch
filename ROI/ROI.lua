@@ -1,7 +1,8 @@
 ROI = torch.class('detection.ROI')
 utils = detection.GeneralUtils()
 function ROI:__init()
-    self._roidb = {}
+    self._roidb = tds.Hash()
+    self.n_class = 0
 end
 
 
@@ -56,11 +57,13 @@ function ROI:create_roidb(db)
   -- Function that creates the roidb needed for training
     -- save the name of the database
     self.db_name = db.dataset_name
+    self.n_class = db:nclass()
     db:loadROIDB()
+    print('Creating the training dataset...')
     for i = 1,db:size() do
       -- Attach proposal information
+      xlua.progress(i,db:size())
       self._roidb[i] = db:attachProposals(i)  
-     
     end
 
     if config.use_flipped then
@@ -113,7 +116,10 @@ end
 
 function ROI:_add_flipped()
   local n_recs = #self._roidb
+  print('Adding flipped images to the training dataset...')
+  local cur_loc = n_recs + 1
   for i=1,n_recs do
+    xlua.progress(i,n_recs)
     local cur_roidb = self._roidb[i]
     local new_rec = utils:tableDeepCopy(cur_roidb)
     -- Adjust the coordinates
@@ -121,7 +127,8 @@ function ROI:_add_flipped()
     new_rec.boxes[{{},{1}}] = -(cur_roidb.boxes[{{},{3}}]-width) + 1
     new_rec.boxes[{{},{3}}] = -(cur_roidb.boxes[{{},{1}}]-width) + 1
     new_rec.flipped = true
-    table.insert(self._roidb,new_rec)
+    self._roidb[cur_loc] = new_rec
+    cur_loc = cur_loc + 1
   end
 
 end
