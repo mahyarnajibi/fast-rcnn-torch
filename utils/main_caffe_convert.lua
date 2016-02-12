@@ -1,10 +1,8 @@
 require('nn')
 require('cudnn')
 require('inn')
-require('nnf')
-debugger = require 'fb.debugger'
+require('detection')
 
-caffeConverter = detection.caffeModelConverter('./','./models/frcnn_alexnet.lua','./data/models/caffe_model_proto/CaffeNet/test.prototxt','./data/models/caffe_fast_rcnn_models/caffenet_fast_rcnn_iter_40000.caffemodel')
+caffeConverter = detection.CaffeModelConverter('./models/VGG16/VGG16_imgnet.lua','/mnt/mag5tb/data/detection/data/imagenet_models/VGG16.prototxt','/mnt/mag5tb/data/detection/data/imagenet_models/VGG16.v2.caffemodel','VGG16.v2','./')
 caffeConverter:convert()
-
 
