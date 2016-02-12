@@ -3,7 +3,7 @@ local WeightedSmoothL1Criterion, parent = torch.class('detection.WeightedSmoothL
 function WeightedSmoothL1Criterion:__init(sizeAverage)
    parent.__init(self)
    -- Local SmoothL1Loss
-   self._smoothL1Loss = nn.SmoothL1Criterion()
+   self._smoothL1Loss = nn.SmoothL1Criterion():cuda()
    self._smoothL1Loss.sizeAverage = false
 end
 

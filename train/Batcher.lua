@@ -1,11 +1,12 @@
 Batcher = torch.class('detection.Batcher')
 local inputMaker = detection.InputMaker()
 local utils = detection.GeneralUtils()
-function Batcher:__init(roidb)
-	self._roidb = roidb
-	self._n_images = #roidb
+function Batcher:__init(roi)
+	self._roidb = roi:get_roidb()
+	self._n_images = #self._roidb
 	self._cur_image = 1
 	self._rand_perm = torch.randperm(self._n_images)
+	self.n_class = roi.n_class
 end
 
 
@@ -91,11 +92,13 @@ function Batcher:_process_batch(ids)
 	if config.nGPU > 1 then
 		local keep_inds = torch.LongTensor(min_num_rois*n_images)
 		for i =1,n_images do
-			local cur_inds = utils:logical2inds(roi_batch[{{},{1}}].eq(i))
-			if cur_inds:numel()> min_num_rois then
-				-- TODO: Complete this part
-			end
+			local cur_inds = utils:logical2ind(roi_batch[{{},{1}}]:eq(i))
+			keep_inds[{{(i-1)*min_num_rois+1,i*min_num_rois}}] = cur_inds[{{1,min_num_rois}}]
 		end
+		roi_batch = roi_batch:index(1,keep_inds)
+		labels = labels:index(1,keep_inds)
+		bbox_targets = bbox_targets:index(1,keep_inds)
+		loss_weights = loss_weights:index(1,keep_inds)
 	end
 	-- Batch images
 	local max1 = -math.huge
@@ -119,8 +122,8 @@ function Batcher:_process_batch(ids)
 end
 
 function Batcher:_get_loss_weights(bbox_targets)
-	local n_class = self._roidb[1].overlap_class:size(2)
-	local loss_weights = torch.ByteTensor(bbox_targets:size(1),4*n_class+4):zero()
+
+	local loss_weights = torch.ByteTensor(bbox_targets:size(1),4*self.n_class+4):zero()
 	local labels = bbox_targets[{{},{1}}]
 	local bbox_targets = bbox_targets[{{},{2,5}}]
 	for i=1,bbox_targets:size(1) do

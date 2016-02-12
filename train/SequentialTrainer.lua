@@ -12,7 +12,7 @@ function SequentialTrainer:__init(cls_criterion,reg_criterion,roi)
 	self._cls_criterion = cls_criterion
 	self._reg_criterion = reg_criterion
 	self._timer = torch.Timer()
-	self._batcher = detection.Batcher(roi:get_roidb())
+	self._batcher = detection.Batcher(roi)
 	self._roi_means = torch.zeros(4,1):cat(roi.means:view(-1,1),1):cuda()
 	self._roi_stds = torch.zeros(4,1):cat(roi.stds:view(-1,1),1):cuda()
 	self._db_name = roi.db_name
@@ -23,32 +23,67 @@ function SequentialTrainer:__init(cls_criterion,reg_criterion,roi)
 	local _log_name = network.name .. '_' .. self._db_name .. os.date('_%m.%d_%H.%M')
 	self._log_path = paths.concat(config.log_path,_log_name)
 	self._logger = optim.Logger(self._log_path)
+
 end
 
+function SequentialTrainer:_computeGamma(lr_range,n_iter)
+	return math.exp((1/n_iter) * math.log(lr_range[2]/lr_range[1]))
+end
+
+function SequentialTrainer:_getLR(iter,base_lr,gamma)
+	return base_lr * gamma ^ (iter)
+
+end
 
 function SequentialTrainer:train()
 	local num_regimes = #config.optim_regimes
 	local start_iter = 1
 	local end_iter = 0
+
+	-- Loading the optim state if we are resume training
+	if config.resume_training then
+		print('Loading the optmizer state for resuming training...')
+		local optim_path = paths.concat(config.save_path,network.name .. '_' ..  _db_name .. '.t7') 
+		self._optimState = torch.load(optim_path)
+	else
+		self._optimState = {}
+	end
+
+
 	for r = 1,num_regimes do
-		self._optimState = {
-	         learningRate = config.optim_regimes[r][2],
-	         learningRateDecay = 0.0,
-	         momentum = config.optim_momentum,
-	         dampening = 0.0,
-	         weightDecay = config.optim_regimes[r][3],
-	         evalCounter = 0.0
-      	}
+		-- Set the optim parameters...
+		self._optimState.learningRateDecay = 0.0
+		self._optimState.momentum = config.optim_momentum
+		self._optimState.weightDecay = config.optim_regimes[r][3]
+		self._optimState.dampening = 0.0
+		self._optimState.evalCounter = 0.0
+
+		-- Compute the current gamma
+		local gamma
+		if config.optim_lr_decay_policy == 'exp' then
+			gamma = self:_computeGamma(config.optim_regimes[r][2],config.optim_regimes[r][1])
+		end
+
+
+
 		end_iter = end_iter + config.optim_regimes[r][1]
 		for i=start_iter,end_iter do
+
+			-- Compte the current LR
+			local lr
+			if config.optim_lr_decay_policy == 'fixed' then
+				lr = config.optim_regimes[r][2]
+			else
+				lr = self:_getLR(i-start_iter,config.optim_regimes[r][2][1],gamma)
+			end
 			local inputs,labels,loss_weights = self._batcher:getNextBatch()
-			self:_trainBatch(inputs,labels,loss_weights,i)
+			self:_trainBatch(inputs,labels,loss_weights,i,lr)
 		end
 		start_iter = end_iter+1		
 	end
 end
 
-function SequentialTrainer:_trainBatch(inputs_cpu,labels_cpu,loss_weights_cpu,iter)
+function SequentialTrainer:_trainBatch(inputs_cpu,labels_cpu,loss_weights_cpu,iter,lr)
 	collectgarbage()
 
 	-- transfer the cpu data into the gpu data
@@ -71,7 +106,11 @@ function SequentialTrainer:_trainBatch(inputs_cpu,labels_cpu,loss_weights_cpu,it
 	end
 
     self._timer:reset()
+
+    -- Set the learning rate
+    self._optimState.learningRate = lr
 	optim.sgd(feval, self._parameters, self._optimState)
+
 	self._avg_cls_loss = self._avg_cls_loss + cls_err
 	self._avg_reg_loss = self._avg_reg_loss + reg_err
 
@@ -92,6 +131,11 @@ function SequentialTrainer:_trainBatch(inputs_cpu,labels_cpu,loss_weights_cpu,it
 		local save_path = paths.concat(config.save_path ,file_name)
 		local net_path = save_path .. '.t7'
 		network:save(net_path,self._roi_means,self._roi_stds)
+
+		-- Save the optim state
+		optim_path = paths.concat(config.save_path,network.name .. '_' ..  _db_name .. '.t7') 
+		torch.save(optim_path,_optimState)
+
 		-- Saving parameters
 		local txt_path = save_path .. '.txt'
 		local file = io.open(txt_path,'w')
