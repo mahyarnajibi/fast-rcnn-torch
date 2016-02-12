@@ -1,4 +1,5 @@
 local heap = require 'utils.heap.binary_heap'
+
 NetworkWrapper = torch.class('detection.NetworkWrapper')
 local utils = detection.GeneralUtils()
 local ROI = detection.ROI()
@@ -68,8 +69,8 @@ function NetworkWrapper:testNetwork(db)
   self:evaluate()
 
   -- Container to save detections per class
-  local all_detections = {}
-  for i=1,n_class do all_detections[i] = {} end
+  local all_detections = tds.Hash()
+  for i=1,n_class do all_detections[i] = tds.Hash() end
 
   -- Adaptive class thresholds
   local thresholds = {}

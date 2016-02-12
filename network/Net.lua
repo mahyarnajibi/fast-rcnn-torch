@@ -1,20 +1,42 @@
 Net = torch.class('detection.Net')
 local utils = detection.GeneralUtils()
-function Net:__init(model_path,weight_file_path)
+function Net:__init(model_path,weight_file_path,model_opt)
 	self.model_path = model_path
 	self.weight_file_path = weight_file_path
-
+	self.model_opt = model_opt
 	if model_path == nil then
 		error 'The first argument can not be nil!'
 	end
-	self.model,self.classifier,self.regressor,self.name = dofile(model_path)
-	self.model:cuda()
+	self.model,self.classifier,self.regressor,self.name = dofile(model_path)(model_opt)
+
+	if config.nGPU > 1 then
+		self:_makeParallel()
+	end
+	-- FOR DEBUG
 	self.parameters, self.gradParameters = self.model:getParameters()
 
 	if weight_file_path~=nil then
 		self:load_weight()
 	end
 end
+
+function Net:_makeParallel()
+	local gpus = torch.range(1, config.nGPU):totable()
+	--FOR DEBUG
+	gpus = {1,3}
+	local fastest, benchmark = cudnn.fastest, cudnn.benchmark
+	local parallel_model = nn.DataParallelTable(1,true,true):cuda():add(self.model,gpus)
+	:threads(function()
+            local cudnn = require 'cudnn'
+            local inn = require 'inn'
+            local detection = require 'detection'
+            cudnn.fastest, cudnn.benchmark = fastest, benchmark
+         end)
+      parallel_model.gradInput = nil
+
+     self.model = parallel_model:cuda()
+end
+
 
 function Net:initialize_for_training()
 	-- initialize classifier and regressor with appropriate random numbers 
@@ -25,17 +47,20 @@ function Net:initialize_for_training()
 end
 
 function Net:load_weight(weight_file_path)
+
 	if weight_file_path~=nil then
 		self.weight_file_path = weight_file_path
 	end
+	local loaded_model = torch.load(self.weight_file_path)
+	if self.model_opt.fine_tunning then
+		-- romove the last layer then
+		loaded_model:remove(#loaded_model.modules)
+	end
 	-- Loading parameters
-	params = torch.load(self.weight_file_path):getParameters()
+	params = loaded_model:getParameters()
 	-- Copying parameters
+
  	self.parameters[{{1,params:size(1)}}]:copy(params)
- 	-- Parallelizing the network
- 	if config.nGPU > 1 then
- 		self.model = utils:makeWholeNetworkParallel(self.model)
- 	end
  end
 
 function Net:getParameters()
