@@ -1,0 +1,3 @@
+[submodule "utils/COCO-python-wrapper/coco-master"]
+	path = utils/COCO-python-wrapper/coco-master
+	url = https://github.com/pdollar/coco.git

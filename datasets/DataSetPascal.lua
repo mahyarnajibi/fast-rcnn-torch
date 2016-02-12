@@ -6,8 +6,7 @@ local io = require 'io'
 local argcheck = dofile'datasets/argcheck.lua'--require 'argcheck'
 local xml = require 'xml'
 local utilities = detection.GeneralUtils()
-local concat = utilities.concat
-local boxoverlap = utilities.boxoverlap
+
 
 matio.use_lua_strings = true
 
@@ -171,7 +170,7 @@ end
 
 function DataSetPascal:getImageSize(i)
   local anno = self:getAnnotation(i)
-  return {anno.size.width,anno.size.height}
+  return torch.IntTensor({anno.size.width,anno.size.height})
 end
 
 function DataSetPascal:nclass()
@@ -297,6 +296,10 @@ function DataSetPascal:loadROIDB()
     end
   end
   
+end
+
+function DataSetPascal:getImagePath(i)
+  return string.format(self.imgpath,self.img_ids[i])
 end
 
 function DataSetPascal:getROIBoxes(i)

@@ -24,6 +24,9 @@ end
 function DataSetDetection:getROIBoxes(i)
 end
 
+function DataSetDetection:getImagePath(i)
+end
+
 function DataSetDetection:getGTBoxes(i)
 end
 
@@ -91,12 +94,13 @@ function DataSetDetection:attachProposals(i)
   local num_boxes = boxes:dim() > 0 and boxes:size(1) or 0
   local num_gt_boxes = #gt_classes
   
-  local rec = {}
+  local rec = tds.Hash()
   rec.gt = utilities:concat(torch.ByteTensor(num_gt_boxes):fill(1),
-                  torch.ByteTensor(num_boxes):fill(0)    )
-  
-  rec.overlap, rec.correspondance, rec.overlap_class =
+                  torch.ByteTensor(num_boxes):fill(0))
+  local overlap_class
+  rec.overlap, rec.correspondance, overlap_class =
                     self:bestOverlap(all_boxes,gt_boxes,gt_classes)
+
   rec.label = torch.IntTensor(num_boxes+num_gt_boxes):fill(0)
   for idx=1,(num_boxes+num_gt_boxes) do
     local corr = rec.correspondance[idx]
@@ -118,14 +122,10 @@ function DataSetDetection:attachProposals(i)
     end
   end
   
-  function rec:size()
-    return (num_boxes+num_gt_boxes)
-  end
-  
   rec.image_size = self:getImageSize(i)
 
   rec.flipped = false
-  rec.image_path = string.format(self.imgpath,self.img_ids[i])
+  rec.image_path = self:getImagePath(i)
 
   return rec
 end
