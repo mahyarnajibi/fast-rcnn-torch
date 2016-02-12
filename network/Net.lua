@@ -12,7 +12,7 @@ function Net:__init(model_path,weight_file_path,model_opt)
 	if config.nGPU > 1 and not model_opt.test then
 		self:_makeParallel()
 	end
-	-- FOR DEBUG
+
 	self.parameters, self.gradParameters = self.model:getParameters()
 
 	if weight_file_path~=nil then
@@ -22,8 +22,6 @@ end
 
 function Net:_makeParallel()
 	local gpus = torch.range(1, config.nGPU):totable()
-	--FOR DEBUG
-	gpus = {1,3}
 	local fastest, benchmark = cudnn.fastest, cudnn.benchmark
 	local parallel_model = nn.DataParallelTable(1,true,true):cuda():add(self.model,gpus)
 	:threads(function()
@@ -78,6 +76,11 @@ end
 function Net:save(save_path,means,stds)
 	-- First sanitize the net
 	self:_sanitize()
+	local isParallel = (torch.type(self.model) == 'nn.DataParallelTable')
+	if isParallel then
+		self.model = self.model:get(1)
+	end
+	collectgarbage()
 	local tmp_regressor
 	if means ~= nil then
 	-- Undo the normalization
@@ -91,6 +94,10 @@ function Net:save(save_path,means,stds)
 		self.regressor.weight = tmp_regressor.weight
 		self.regressor.bias = tmp_regressor.bias
 	end
+
+	 if isParallel then
+	 	self:_makeParallel()
+	 end
 end
 
 function Net:load_from_caffe(proto_path,caffemodel_path,save_path,model_name)
