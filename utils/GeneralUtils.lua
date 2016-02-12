@@ -41,13 +41,22 @@ end
 
 function GeneralUtils:tableDeepCopy(tab)
   if type(tab)=='userdata' and tab.clone ~= nil then return tab:clone() end -- for dealing with tensors
-  if type(tab) ~= 'table' then return tab end
-  local res = setmetatable({}, getmetatable(tab))
-  for k, v in pairs(tab) do res[self:tableDeepCopy(k)] = self:tableDeepCopy(v) end
+  if type(tab) ~= 'table' and type(tab) ~= 'cdata' then return tab end
+  local res
+  if type(tab) == 'table' then
+    res = setmetatable({}, getmetatable(tab))
+    for k, v in pairs(tab) do res[self:tableDeepCopy(k)] = self:tableDeepCopy(v) end
+  else -- We are dealing with tds
+    res = tds.Hash()
+    for k, v in pairs(tab) do res[self:tableDeepCopy(k)] = self:tableDeepCopy(v) end
+  end
   return res
 end
 
 function GeneralUtils:logical2ind(logical)
+  if logical:numel() == 0 then
+    return torch.LongTensor()
+  end
   return torch.range(1,logical:numel())[logical:gt(0)]:long()
 end
 
