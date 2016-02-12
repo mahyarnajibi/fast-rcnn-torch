@@ -6,7 +6,7 @@ require 'detection'
 local dataset_name = config.dataset
 local image_set = config.train_img_set
 local dataset_dir = paths.concat(config.dataset_path,dataset_name)
-local ss_dir = '../frcnn_torch/data/datasets/selective_search/'
+local ss_dir = './data/datasets/selective_search/'
 local ss_file =  paths.concat(ss_dir, dataset_name .. '_' .. image_set .. '.mat')
 local param_path = config.pre_trained_file
 local model_path = config.model_def
