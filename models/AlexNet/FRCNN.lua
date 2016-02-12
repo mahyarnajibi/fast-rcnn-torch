@@ -6,6 +6,7 @@ local utils = detection.GeneralUtils()
 -- 3) return a local variable named classifier pointing ro weights of the classifier (without SoftMax!)
 -- 4) return the name of the model (used for saving models and logs)
   
+ local function create_model(opt) 
   local name = 'frcnn_alexnet'
   backend = backend or cudnn
 
@@ -74,6 +75,8 @@ local utils = detection.GeneralUtils()
   model:add(linear)
   model:add(output)
 
-
+  model:cuda()
   return model,classifier,regressor,name
+end
 
+return create_model
