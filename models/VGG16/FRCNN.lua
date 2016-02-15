@@ -106,9 +106,9 @@ local utils = detection.GeneralUtils()
 
 
 	-- classifier
-	local classifier = nn.Linear(4096,21)
+	local classifier = nn.Linear(4096,opt.nclass +1)
 	-- regressor
-	local regressor = nn.Linear(4096,84)
+	local regressor = nn.Linear(4096,4 * (opt.nclass+1))
 
 	local output = nn.ConcatTable()
 	output:add(classifier)

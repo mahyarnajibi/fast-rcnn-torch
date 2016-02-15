@@ -1,6 +1,5 @@
 -- Require the detection package
 require 'detection'
-
 -- Paths
 local dataset_name = config.dataset
 local image_set = config.train_img_set
@@ -15,12 +14,13 @@ local model_path = config.model_def
 local dataset = detection.DataSetPascal({image_set = image_set, datadir = dataset_dir, roidbdir = ss_dir , roidbfile = ss_file})
 --local dataset = detection.DataSetCoco({image_set = image_set, datadir = dataset_dir})
 
+
 -- Creating the detection network
 model_opt = {}
 model_opt.test = false
+model_opt.nclass = dataset:nclass()
 model_opt.fine_tunning = not config.resume_training
 
--- model_opt.f
 network = detection.Net(model_path,param_path,model_opt)
 -- Creating the network wrapper
 local network_wrapper = detection.NetworkWrapper() -- This adds train and test functionality to the global network
