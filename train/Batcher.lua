@@ -148,21 +148,30 @@ function Batcher:_select_rois(roidb_entry)
 
 
 	-- Sampling fgs without replacement
-	local selected_fg_inds = torch.ByteTensor()
+	local selected_fg_inds = torch.LongTensor()
 	if cur_num_fg > 0 then
 		fg_inds = utils:shuffle(1,fg_inds)
 		selected_fg_inds = fg_inds[{{1,cur_num_fg}}]
 	end
 
 	-- Sampling bgs without replacement
-	local selected_bg_inds = torch.ByteTensor()
+	local selected_bg_inds = torch.LongTensor()
 	if cur_num_bg > 0 then
 		bg_inds = utils:shuffle(1,bg_inds)
 		selected_bg_inds = bg_inds[{{1,cur_num_bg}}]
 	end
 
 	-- Create the sampled batch
-	local batch_ids = selected_fg_inds:cat(selected_bg_inds)
+	local batch_ids
+	if selected_fg_inds:numel()>0 and selected_bg_inds:numel() > 0 then
+		batch_ids = selected_fg_inds:cat(selected_bg_inds)
+	elseif selected_bg_inds:numel() > 0 then
+		batch_ids = selected_bg_inds
+	elseif selected_fg_inds:numel() > 0 then
+		batch_ids = selected_fg_inds
+	else
+		print('There is a sample with no positive and negative bounding boxes!')
+	end
 	local batch_rois = roidb_entry.boxes:index(1,batch_ids)
 	local batch_labels = torch.IntTensor(batch_ids:numel(),1):zero()
 	batch_labels[{{1,selected_fg_inds:numel()}}]= roidb_entry.label:index(1,selected_fg_inds)

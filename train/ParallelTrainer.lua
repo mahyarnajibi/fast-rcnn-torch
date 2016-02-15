@@ -129,11 +129,13 @@ function ParallelTrainer:train()
      			  end
 			else
 				local inputs,labels,loss_weights = _batcher:getBatch(img_ids)
-				self._trainBatch(inputs,labels,loss_weights,i)
+				self._trainBatch(inputs,labels,loss_weights,i,lr)
 			end
 		end
 		start_iter = end_iter + 1
 	end
+	self._thread_pool:synchronize()
+	cutorch.synchronize()
 end
 
 

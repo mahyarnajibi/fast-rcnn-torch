@@ -14,7 +14,13 @@ function WeightedSmoothL1Criterion:updateOutput(input, target)
 	local targets = target[1]:repeatTensor(1,repeat_size)
 	local weights = target[2]
    local n_row = targets:size(1)
-	self.output = self._smoothL1Loss:forward(input[weights],targets[weights])	
+   local cur_input = input[weights]
+   local cur_target = targets[weights]
+   if cur_input:numel() == 0 then
+      -- This sample does not have any gts
+      return 0.0
+   end
+	self.output = self._smoothL1Loss:forward(cur_input,cur_target)	
    self.output = self.output / n_row
    return self.output
 end
@@ -24,8 +30,12 @@ function WeightedSmoothL1Criterion:updateGradInput(input, target)
    local targets = target[1]:repeatTensor(1,repeat_size)
    local weights = target[2]
    local n_row = targets:size(1)
-   local smoothL1grad = self._smoothL1Loss:backward(input[weights],targets[weights])/n_row
    self.gradInput:resizeAs(input):zero()
-   self.gradInput[weights] = smoothL1grad
+   local cur_input = input[weights]
+   local cur_target = targets[weights]
+   if cur_input:numel() > 0 then
+      local smoothL1grad = self._smoothL1Loss:backward(cur_input,cur_target)/n_row
+      self.gradInput[weights] = smoothL1grad
+   end
    return self.gradInput
 end

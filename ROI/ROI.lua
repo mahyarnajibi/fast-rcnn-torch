@@ -146,7 +146,11 @@ function ROI:_get_targets(roidb_entry)
     -- This function determines targets for the bounding boxes
 
     local boxes = roidb_entry.boxes:float()
-    local gt_boxes = boxes:index(1,utils:logical2ind(roidb_entry.gt))
+    local gt_inds = utils:logical2ind(roidb_entry.gt)
+    if gt_inds:numel() == 0 then
+      return torch.DoubleTensor(boxes:size(1),5):zero()
+    end
+    local gt_boxes = boxes:index(1,gt_inds)
     local max_overlaps = roidb_entry.overlap
 
     local selected_ids = utils:logical2ind(max_overlaps:ge(config.bbox_threshold))
