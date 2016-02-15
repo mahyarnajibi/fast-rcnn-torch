@@ -214,6 +214,72 @@ function DataSetCoco:_mapImageIDs()
 	end
 end
 
+function DataSetCoco:_createSampleSet(nSample_per_class,min_objs_per_img,new_image_set_name)
+
+	local n_images = self:size()
+	local n_class = self:nclass()
+	local class_counts = torch.IntTensor(n_images,n_class):zero()
+	for i=1,n_images do
+		local cur_classes = self.gts[i].classes
+		for c=1,cur_classes:numel() do
+			class_counts[i][cur_classes[c]] = class_counts[i][cur_classes[c]] + 1
+		end
+	end
+	local already_selected = torch.ByteTensor(n_images):zero()
+	local new_roidb = tds.Hash()
+	local new_gts = tds.Hash()
+	local new_paths = tds.Hash()
+	local new_image_ids = torch.IntTensor()
+	local new_image_sizes = torch.IntTensor()
+	local new_inverted_image_ids = tds.Hash()
+	local objs_per_img = class_counts:sum(2)
+	local img_count = 1
+	debugger.enter()
+	for c=1,n_class do
+		local valid_samples = class_counts[{{},{c}}]:ge(1):cmul(objs_per_img:ge(min_objs_per_img)):cmul(already_selected:eq(0)):eq(1)
+		valid_samples = utils:logical2ind(valid_samples)
+		-- select a random subset
+		valid_samples = utils:shuffle(1,valid_samples)
+		local n_samples = math.min(valid_samples:numel(),nSample_per_class)
+		for i =1, n_samples do
+			already_selected[valid_samples[i]] = 1
+			new_gts[img_count] = self.gts[valid_samples[i]]
+			new_paths[img_count] = self.image_paths[valid_samples[i]]
+			new_inverted_image_ids[self.image_ids[valid_samples[i]]] = img_count
+			new_roidb[img_count] = self.roidb[valid_samples[i]]
+			if img_count == 1 then
+				new_image_sizes = self.image_sizes[valid_samples[i]]:view(1,2)
+				new_image_ids = torch.IntTensor({self.image_ids[valid_samples[i]]})
+			else
+				new_image_ids = new_image_ids:cat(torch.IntTensor({self.image_ids[valid_samples[i]]}))
+				new_image_sizes = new_image_sizes:cat(self.image_sizes[valid_samples[i]]:view(1,2),1)
+			end
+
+			img_count = img_count + 1
+		end
+	end
+
+	-- Save the new imageset annotations
+	local annotations_cache_path = paths.concat(config.cache,'coco_'.. new_image_set_name ..self.year ..'_annotations_cached.t7')
+	local saved_annotations = tds.Hash()
+	saved_annotations.class_mapping_from_coco = self.class_mapping_from_coco
+	saved_annotations.class_mapping_to_coco = self.class_mapping_to_coco
+	saved_annotations.classes = self.classes
+	saved_annotations.image_paths = new_paths
+	saved_annotations.image_ids = new_image_ids
+	saved_annotations.image_sizes = new_image_sizes
+	saved_annotations.inverted_image_ids = new_inverted_image_ids
+	saved_annotations.gts = new_gts
+	torch.save(annotations_cache_path,saved_annotations)
+
+	-- Save the new proposals file
+	local cache_name = 'proposals_' .. self.proposal_method ..'_coco' .. self.year .. '_' .. new_image_set_name .. '_top' .. self.top_k ..'.t7'
+	local cache_path = paths.concat(config.cache,cache_name)
+	torch.save(cache_path,new_roidb)
+
+
+end
+
 function DataSetCoco:_prepareGTs()
 	-- Index annotations by image number
 	if self.gts then
