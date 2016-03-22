@@ -11,7 +11,16 @@ local param_path = config.model_weights
 local model_path = config.model_def
 
 -- Creating the network
-network = detection.Net(model_path,param_path)
+local model_opt = {}
+model_opt.fine_tuning = false
+model_opt.test = true
+if config.dataset== 'MSCOCO' then
+   model_opt.nclass = 80
+else
+   model_opt.nclass = 20
+end
+
+network = detection.Net(model_path,param_path,model_opt)
 
 -- Creating the network wrapper
 local network_wrapper = detection.NetworkWrapper(network)

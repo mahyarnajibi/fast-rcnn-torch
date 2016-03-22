@@ -15,9 +15,10 @@ local model_path = config.model_def
 local dataset = detection.DataSetPascal({image_set = image_set, datadir = dataset_dir, roidbdir = ss_dir , roidbfile = ss_file})
 
 -- Creating the detection net
-local model_opt = {}
-model_opt.fine_tuning = false
-model_opt.test = true
+model_opt = {}
+model_opt.test = false
+model_opt.nclass = dataset:nclass()
+model_opt.fine_tunning = not config.resume_training
 network = detection.Net(model_path,param_path, model_opt)
 
 -- Creating the wrapper

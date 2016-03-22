@@ -1,4 +1,4 @@
--- All parameters goes here
+--- All parameters goes here
 config = config or {}
 
 function config.parse(arg)
@@ -17,8 +17,8 @@ function config.parse(arg)
 	cmd:option('-max_size', 1000, 'Max pixel size of the longest side of a scaled input image')
 	cmd:option('-img_per_batch', 2, 'Images to be used per minibatch')
 	cmd:option('-GPU_ID',1,'Main GPU Id to be used')
-	cmd:option('-n_threads',2, 'Number of threads used for training')
-	cmd:option('-nGPU',2,'Number of GPUs to be used for training') -- This feature is not ready yet
+	cmd:option('-n_threads',1, 'Number of threads used for training')
+	cmd:option('-nGPU',1,'Number of GPUs to be used for training') -- This feature is not ready yet
 	cmd:option('-roi_per_img', 64, 'Minibatch size')
 	cmd:option('-fg_fraction', 0.25, 'Fraction of minibatch that is labeled foreground (i.e. class > 0)')
 	cmd:option('-fg_threshold', 0.5, 'Overlap threshold for a ROI to be considered foreground (if >= FG_THRESH)')
