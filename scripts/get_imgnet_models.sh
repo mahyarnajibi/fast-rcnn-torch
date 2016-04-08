@@ -3,7 +3,7 @@ dir_name=${PWD##*/}
 echo $dir_name
 
 file_name=imgnet_models.tar.gz
-URL=http://www.umiacs.umd.edu/~najibi/data
+URL=http://www.umiacs.umd.edu/~najibi/data/imgnet_models.tar.gz
 
 
 if [ "$dir_name" = "scripts" ]; then
@@ -22,7 +22,7 @@ else
 	if [ ! -d "$save_path" ]; then
 		mkdir $save_path
 	fi
-	echo "Downloading the fast-rcnn_models..."
+	echo "Downloading the imagenet models..."
 	wget $URL -O $file_path
 	echo "Uzip the file..."
 

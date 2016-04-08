@@ -3,7 +3,7 @@ dir_name=${PWD##*/}
 echo $dir_name
 
 file_name=frcnn_torch_models.tar.gz
-URL=http://www.umiacs.umd.edu/~najibi/data
+URL=http://www.umiacs.umd.edu/~najibi/data/frcnn_torch_models.tar.gz
 
 
 if [ "$dir_name" = "scripts" ]; then
