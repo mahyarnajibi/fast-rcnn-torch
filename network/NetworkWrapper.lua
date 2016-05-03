@@ -1,4 +1,3 @@
-local heap = require 'utils.heap.binary_heap'
 
 NetworkWrapper = torch.class('detection.NetworkWrapper')
 local utils = detection.GeneralUtils()
@@ -60,6 +59,7 @@ function NetworkWrapper:testNetwork(db)
   -- preparing the dataset
   local n_image = db:size()
   local n_class = db.num_classes
+  --local debug = false
   db:loadROIDB()
   -- heuristics
   local max_per_set = 40 * n_image
@@ -77,8 +77,8 @@ function NetworkWrapper:testNetwork(db)
   for i=1,n_class do thresholds[i] = -math.huge end
 
   -- Min heaps for maintaining max_per_set constraint
-    local heaps={}
-    for i=1,n_class do heaps[i] = heap() end
+  local heaps= {}
+  for i=1,n_class do heaps[i] = detection.heap(max_per_set) end
 
   -- Do the detection and save the results
   local detect_timer = torch.Timer()
@@ -88,7 +88,7 @@ function NetworkWrapper:testNetwork(db)
 
 
   for i=1,n_image do
-
+    collectgarbage()
     local im = db:getImage(i)
     -- Get the bounding boxes 
     local bboxes = db:getROIBoxes(i)
@@ -100,6 +100,11 @@ function NetworkWrapper:testNetwork(db)
 
     local scores,pred_boxes = self:detect(im,bboxes)
     local det_time = detect_timer:time().real
+    --if debug then
+    --    local classes = db.classes
+    --    utils:visualize_detections(im,pred_boxes,scores,0.3,classes)
+    --    debugger.enter()
+    --end
     avg_det_time = avg_det_time + det_time
 
     misc_timer:reset()
@@ -115,9 +120,8 @@ function NetworkWrapper:testNetwork(db)
           class_scores = class_scores:index(1,sel_inds)
           -- keep top k scoring boxes
           -- here you can use torch.topk if your torch is up-to-date
-          local top_scores , top_inds = torch.sort(class_scores, 1, true)
-          top_inds = top_inds[{{1,math.min(max_per_image,top_inds:numel())},{}}]:long()
-          top_inds = top_inds:resize(top_inds:numel())
+          local top_scores,top_inds = class_scores:topk(math.min(max_per_image,class_scores:numel()),1,true)
+          top_inds = top_inds:squeeze(2)
 
           class_scores = class_scores:index(1,top_inds):resize(top_inds:numel())
           class_boxes = class_boxes:index(1,top_inds)
@@ -126,15 +130,15 @@ function NetworkWrapper:testNetwork(db)
           
           -- Push all values into the corresponding heap
           for k=1,class_scores:numel() do
-            heaps[j]:add(class_scores[k])
+             heaps[j]:push(class_scores[k])
           end
 
           -- Pop if you collected more than max_per_set
-          if heaps[j]:getSize()> max_per_set then
-            while heaps[j]:getSize()>max_per_set do
-              heaps[j]:pop()
-              thresholds[j] = heaps[j]:top()
-            end
+          if heaps[j].length> max_per_set then
+             while heaps[j].length>max_per_set do
+               heaps[j]:pop()
+               thresholds[j] = heaps[j]:top()
+             end
           end
 
           -- Save all detections for now
