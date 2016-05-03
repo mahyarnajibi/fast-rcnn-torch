@@ -11,12 +11,22 @@ local model_path = config.model_def
 
 
 -- Loading the dataset
-local dataset = detection.DataSetPascal({image_set = image_set, datadir = dataset_dir, roidbdir = ss_dir , roidbfile = ss_file})
---local dataset = detection.DataSetCoco({image_set = image_set, datadir = dataset_dir})
-
-
--- Creating the detection network
+local dataset
 model_opt = {}
+if config.dataset == 'MSCOCO' then
+	print('MSCOCO '.. image_set)
+	dataset = detection.DataSetCoco({image_set = image_set, datadir = dataset_dir, test_mode = false})
+	model_opt.nclass = 80
+else
+	print('VOC '.. image_set)
+	local year = 2007
+	if config.dataset:find(2012) then
+		year = 2012
+	end
+	dataset = detection.DataSetPascal({image_set = image_set, datadir = dataset_dir, roidbdir = ss_dir , roidbfile = ss_file, year = year})
+	model_opt.nclass = 20
+end
+-- Creating the detection network
 model_opt.test = false
 model_opt.nclass = dataset:nclass()
 model_opt.fine_tunning = not config.resume_training
