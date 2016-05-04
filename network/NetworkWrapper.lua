@@ -116,7 +116,7 @@ function NetworkWrapper:testNetwork(db)
           all_detections[j][i] = torch.FloatTensor()
         else
 
-          local class_boxes = pred_boxes:index(1,sel_inds)[{{},{j*4+1,(j+1)*4}}]
+          local class_boxes = pred_boxes[{{},{j*4+1,(j+1)*4}}]:index(1,sel_inds)
           class_scores = class_scores:index(1,sel_inds)
           -- keep top k scoring boxes
           -- here you can use torch.topk if your torch is up-to-date
