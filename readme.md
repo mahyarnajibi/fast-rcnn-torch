@@ -2,7 +2,7 @@
 This is a torch implementation of the Fast R-CNN proposed by Girshick et .al. [1].
 ## Requirements
 * You need to install torch.
-* The current implementation uses these torch packages: ```nn, inn, cudnn, image, matio, optim, paths ```
+* The current implementation uses these torch packages: ```nn, inn, cudnn, image, matio, optim, paths, xml, dkjson ```
 * You need a machine with CUDA GPU.
 *  You need to download the required weights and proposal files as discussed below.
 
