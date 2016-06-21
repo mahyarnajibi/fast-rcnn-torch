@@ -1,6 +1,6 @@
 require 'optim'
 require 'paths'
-SequentialTrainer = torch.class('detection.SequentialTrainer')
+local SequentialTrainer = torch.class('detection.SequentialTrainer')
 local utils = detection.GeneralUtils()
 local _iter_show = 20
 function SequentialTrainer:__init(cls_criterion,reg_criterion,roi)
@@ -8,13 +8,20 @@ function SequentialTrainer:__init(cls_criterion,reg_criterion,roi)
 	self._avg_cls_loss = 0
 	self._avg_reg_loss = 0
 	network:training()
-	network:initialize_for_training()
+	self._roi_means = torch.zeros(4,1):cat(roi.means:view(-1,1),1):cuda()
+	self._roi_stds = torch.zeros(4,1):cat(roi.stds:view(-1,1),1):cuda()
+	if not config.resume_training then
+		print('Initializing the regression and classification layers...')
+		network:initialize_for_training()
+	else
+		print('Preparing the regression layer weights...')
+		network:_prepare_regressor(self._roi_means,self._roi_stds)
+	end
 	self._cls_criterion = cls_criterion
 	self._reg_criterion = reg_criterion
 	self._timer = torch.Timer()
 	self._batcher = detection.Batcher(roi)
-	self._roi_means = torch.zeros(4,1):cat(roi.means:view(-1,1),1):cuda()
-	self._roi_stds = torch.zeros(4,1):cat(roi.stds:view(-1,1),1):cuda()
+
 	self._db_name = roi.db_name
 	self._parameters, self._gradParameters = network:getParameters()
 	self._inputs = torch.CudaTensor()
@@ -22,8 +29,8 @@ function SequentialTrainer:__init(cls_criterion,reg_criterion,roi)
 	self._loss_weights = torch.CudaTensor()
 	local _log_name = network.name .. '_' .. self._db_name .. os.date('_%m.%d_%H.%M')
 	self._log_path = paths.concat(config.log_path,_log_name)
-	self._logger = optim.Logger(self._log_path)
 
+	self._logger = optim.Logger(self._log_path)
 end
 
 function SequentialTrainer:_computeGamma(lr_range,n_iter)
@@ -42,10 +49,18 @@ function SequentialTrainer:train()
 	-- Loading the optim state if we are resume training
 	if config.resume_training then
 		print('Loading the optmizer state for resuming training...')
-		local optim_path = paths.concat(config.save_path,network.name .. '_' ..  _db_name .. '.t7') 
-		self._optimState = torch.load(optim_path)
+		local optim_path = paths.concat(config.save_path,paths.basename(config.pre_trained_file,'.t7') .. '_optimState.t7')
+		if paths.filep(optim_path) then
+			self._optimState = torch.load(optim_path)
+			start_iter = self._optimState.evalCounter + 1
+		else
+			print('The optimizer state is not found for continuing the training, a new state is being used!')
+			self._optimState = {}
+			self._optimState.evalCounter = 0
+		end
 	else
 		self._optimState = {}
+		self._optimState.evalCounter = 0
 	end
 
 
@@ -55,7 +70,6 @@ function SequentialTrainer:train()
 		self._optimState.momentum = config.optim_momentum
 		self._optimState.weightDecay = config.optim_regimes[r][3]
 		self._optimState.dampening = 0.0
-		self._optimState.evalCounter = 0.0
 
 		-- Compute the current gamma
 		local gamma
@@ -132,8 +146,8 @@ function SequentialTrainer:_trainBatch(inputs_cpu,labels_cpu,loss_weights_cpu,it
 		network:save(net_path,self._roi_means,self._roi_stds)
 
 		-- Save the optim state
-		optim_path = paths.concat(config.save_path,network.name .. '_' ..  self._db_name .. '.t7') 
-		torch.save(optim_path,_optimState)
+		local optim_path = save_path .. '_optimState.t7' 
+		torch.save(optim_path,self._optimState)
 
 		-- Saving parameters
 		local txt_path = save_path .. '.txt'
