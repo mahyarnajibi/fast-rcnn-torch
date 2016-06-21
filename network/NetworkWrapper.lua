@@ -1,5 +1,5 @@
 
-NetworkWrapper = torch.class('detection.NetworkWrapper')
+local NetworkWrapper = torch.class('detection.NetworkWrapper')
 local utils = detection.GeneralUtils()
 local ROI = detection.ROI()
 local InputMaker = detection.InputMaker()

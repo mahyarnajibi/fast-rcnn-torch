@@ -10,10 +10,12 @@ end
 
 function CaffeLoader:load()
 
-	prototxt = self.prototxt
-	caffemodel_path = self.caffemodel_path
-	caffemodel = loadcaffe.load(prototxt,caffemodel_path,'cudnn')
-	torch_model = dofile(self.torch_model)()
+	local prototxt = self.prototxt
+	local caffemodel_path = self.caffemodel_path
+	local caffemodel = loadcaffe.load(prototxt,caffemodel_path,'cudnn')
+	local opt = {}
+	opt.nclass = 20
+	local torch_model = dofile(self.torch_model)(opt)
 	-- Creating the sequential model from table of moduels
 	-- Copying caffe weight models
 	local torch_parameters = torch_model:getParameters()

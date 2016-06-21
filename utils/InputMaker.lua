@@ -1,5 +1,5 @@
-InputMaker = torch.class('detection.InputMaker')
-
+local InputMaker = torch.class('detection.InputMaker')
+local roi = detection.ROI()
 function InputMaker:__init()
 end
 function InputMaker:process(orig_im,bboxes)
@@ -23,7 +23,7 @@ function InputMaker:process(orig_im,bboxes)
     local out_im = image.scale(im,new_size[2],new_size[1],'bicubic')
 
     -- Project ROIs
-    local out_bboxes = ROI:projectImageROIs({bboxes},{im_scale})
+    local out_bboxes = roi:projectImageROIs({bboxes},{im_scale})
 
   	return out_im,out_bboxes,im_scale
 end

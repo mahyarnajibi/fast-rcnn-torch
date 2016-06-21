@@ -13,7 +13,6 @@ local model_path = config.model_def
 
 -- Loading the dataset
 
-debugger = require 'fb.debugger'
 
 local dataset
 local model_opt = {}

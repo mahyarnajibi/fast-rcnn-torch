@@ -1,4 +1,4 @@
-Batcher = torch.class('detection.Batcher')
+local Batcher = torch.class('detection.Batcher')
 local inputMaker = detection.InputMaker()
 local utils = detection.GeneralUtils()
 function Batcher:__init(roi)

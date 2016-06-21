@@ -1,4 +1,4 @@
-Net = torch.class('detection.Net')
+local Net = torch.class('detection.Net')
 local utils = detection.GeneralUtils()
 function Net:__init(model_path,weight_file_path,model_opt)
 	self.model_path = model_path
@@ -35,6 +35,12 @@ function Net:_makeParallel()
      self.model = parallel_model:cuda()
 end
 
+function Net:_prepare_regressor(means,stds)
+	stds[{{1,4}}] = 1.0
+	self.regressor.weight = self.regressor.weight:cdiv(stds:expand(self.regressor.weight:size()))
+	self.regressor.bias = self.regressor.bias - means:view(-1)
+	self.regressor.bias = self.regressor.bias:cdiv(stds:view(-1))
+end
 
 function Net:initialize_for_training()
 	-- initialize classifier and regressor with appropriate random numbers 
@@ -50,15 +56,44 @@ function Net:load_weight(weight_file_path)
 		self.weight_file_path = weight_file_path
 	end
 	local loaded_model = torch.load(self.weight_file_path)
-	if self.model_opt.fine_tunning then
-		-- romove the last layer then
-		loaded_model:remove(#loaded_model.modules)
-	end
-	-- Loading parameters
-	params = loaded_model:getParameters()
-	-- Copying parameters
 
- 	self.parameters[{{1,params:size(1)}}]:copy(params)
+
+	-- See if the loaded model supports our naming method for loading the weights
+	local has_name = false
+	local loaded_modules = loaded_model:listModules()
+	for i=1,#loaded_modules do
+		if loaded_modules[i].name then
+			has_name = true
+			break
+		end
+	end
+	if has_name then
+		-- Load the weights based on names
+		local model_modules = self.model:listModules()
+		for i=1,#loaded_modules do
+			local copy_name = loaded_modules[i].name
+			if copy_name then
+				for j=1,#model_modules do
+					local my_name = model_modules[j].name
+					if my_name and my_name == copy_name then
+						print('Copying weights from ' .. my_name .. ' layer!')
+						model_modules[j].weight:copy(loaded_modules[i].weight)
+						model_modules[j].bias:copy(loaded_modules[i].bias)
+					end
+				end
+			end
+		end
+	else
+		if self.model_opt.fine_tunning then
+			-- romove the last layer then
+			loaded_model:remove(#loaded_model.modules)
+		end
+		-- Loading parameters
+		params = loaded_model:getParameters()
+		-- Copying parameters
+
+	 	self.parameters[{{1,params:size(1)}}]:copy(params)
+	 end
  end
 
 function Net:getParameters()
