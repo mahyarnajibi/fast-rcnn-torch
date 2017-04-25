@@ -2,9 +2,8 @@
 dir_name=${PWD##*/}
 echo $dir_name
 
-file_name=selective_search_data.tgz
-URL=http://www.cs.berkeley.edu/~rbg/fast-rcnn-data/$file_name
-
+file_name=selective_search_data.tar.gz
+URL=http://www.umiacs.umd.edu/~najibi/data/$file_name
 
 if [ "$dir_name" = "scripts" ]; then
   save_path=../data/datasets/
